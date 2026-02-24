@@ -24,26 +24,54 @@ export default function AppsPage() {
           </h1>
         </div>
         <div className="grid grid-cols-3 gap-8">
-          {BIRD_CATALOG.map((bird) => (
-            <Link
-              key={bird.slug}
-              href={`/apps/${bird.slug}`}
-              className="block relative aspect-square w-full group overflow-hidden"
-            >
-              <Image
-                src={`/birds/${bird.filename}`}
-                alt={bird.slug}
-                fill
-                className="object-cover transition-transform duration-500 group-hover:scale-110"
-                sizes="(max-width: 768px) 33vw, 33vw"
-              />
-              <div className="absolute bottom-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <span className="text-white text-[10px] font-mono font-medium uppercase tracking-widest drop-shadow-md">
-                  {bird.slug.replace(/_/g, " ")}
-                </span>
-              </div>
-            </Link>
-          ))}
+          {BIRD_CATALOG.map((bird) => {
+            const isCardinal = bird.slug === "cardinal";
+
+            if (isCardinal) {
+              return (
+                <a
+                  key={bird.slug}
+                  href="https://birdfinds.com"
+                  className="block relative aspect-square w-full group overflow-hidden"
+                  title="Open Birdfinds"
+                >
+                  <Image
+                    src={`/birds/${bird.filename}`}
+                    alt={bird.slug}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-110"
+                    sizes="(max-width: 768px) 33vw, 33vw"
+                  />
+                  <div className="absolute bottom-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <span className="text-white text-[10px] font-mono font-medium uppercase tracking-widest drop-shadow-md">
+                      {bird.slug.replace(/_/g, " ")}
+                    </span>
+                  </div>
+                </a>
+              );
+            }
+
+            return (
+              <Link
+                key={bird.slug}
+                href={`/apps/${bird.slug}`}
+                className="block relative aspect-square w-full group overflow-hidden"
+              >
+                <Image
+                  src={`/birds/${bird.filename}`}
+                  alt={bird.slug}
+                  fill
+                  className="object-cover transition-transform duration-500 group-hover:scale-110"
+                  sizes="(max-width: 768px) 33vw, 33vw"
+                />
+                <div className="absolute bottom-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <span className="text-white text-[10px] font-mono font-medium uppercase tracking-widest drop-shadow-md">
+                    {bird.slug.replace(/_/g, " ")}
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </main>
     </div>

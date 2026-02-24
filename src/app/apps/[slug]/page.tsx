@@ -1,10 +1,10 @@
+import { redirect } from "next/navigation";
 import { BlackjackTrainer } from "@/components/blackjack-trainer/BlackjackTrainer";
 import { BillSplitter } from "@/components/bill-splitter/BillSplitter";
 import { BenRiceShrine } from "@/components/ben-rice-shrine/BenRiceShrine";
 import { RestaurantVotingApp } from "@/components/pileated-woodpecker-election/RestaurantVotingApp";
 import Link from "next/link";
 import Image from "next/image";
-import { SocialLayout } from "@/components/social-prototype/SocialLayout";
 import { BirdLog } from "@/components/bird-log/BirdLog";
 import { BIRD_CATEGORY_BY_SLUG, BIRD_FILENAME_BY_SLUG } from "@/lib/birds";
 
@@ -19,7 +19,7 @@ export default async function BirdAppPage({
   const isBenRice = false;
   const isBlackjack = slug === "eastern_blue_bird";
   const isElection = slug === "pileated_woodpecker" || slug === "pileated-woodpecker";
-  const isBirdPile = slug === "cardinal";
+  const isCardinal = slug === "cardinal";
 
   if (isBillSplitter) {
     return (
@@ -57,8 +57,8 @@ export default async function BirdAppPage({
     return <RestaurantVotingApp />;
   }
 
-  if (isBirdPile) {
-    return <SocialLayout />;
+  if (isCardinal) {
+    redirect("https://birdfinds.com");
   }
 
   const birdCategory = BIRD_CATEGORY_BY_SLUG[slug as keyof typeof BIRD_CATEGORY_BY_SLUG];
