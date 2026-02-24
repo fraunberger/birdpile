@@ -1,4 +1,4 @@
-import type { Category } from "@/lib/social-prototype/store";
+export type Category = string;
 
 export const BIRD_CATALOG = [
   { slug: "australian_magpie", filename: "australian_magpie.png" },
