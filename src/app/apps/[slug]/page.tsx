@@ -19,7 +19,7 @@ export default async function BirdAppPage({
   if (isBillSplitter) {
     return (
       <div className="min-h-screen bg-white font-mono text-black p-4">
-        <Link href="/apps" className="inline-flex items-center gap-2 mb-4 hover:opacity-70 transition-opacity group">
+        <Link href="/" className="inline-flex items-center gap-2 mb-4 hover:opacity-70 transition-opacity group">
           <span className="text-xl group-hover:-translate-x-1 transition-transform">&larr;</span>
           <div className="relative w-12 h-8">
             <Image src="/logo.png" alt="Apps" fill className="object-contain" />
@@ -33,7 +33,7 @@ export default async function BirdAppPage({
   if (isBlackjack) {
     return (
       <div className="min-h-screen bg-gray-50 font-sans text-black p-4 flex flex-col items-center">
-        <Link href="/apps" className="self-start inline-flex items-center gap-2 mb-8 hover:opacity-70 transition-opacity group">
+        <Link href="/" className="self-start inline-flex items-center gap-2 mb-8 hover:opacity-70 transition-opacity group">
           <span className="text-xl group-hover:-translate-x-1 transition-transform">&larr;</span>
           <div className="relative w-12 h-8">
             <Image src="/logo.png" alt="Apps" fill className="object-contain" />
