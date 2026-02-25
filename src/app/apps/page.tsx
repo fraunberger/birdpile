@@ -11,8 +11,8 @@ export default function AppsPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <header className="py-4 flex justify-center">
-        <div className="relative w-40 h-40">
+      <header className="flex justify-center">
+        <div className="relative w-56 h-56">
           <Image
             src="/logo.png"
             alt="Birdpile Logo"
@@ -27,7 +27,7 @@ export default function AppsPage() {
         <div className="grid grid-cols-3 gap-8">
           {prioritizedBirds.map((bird) => {
             const app = APP_CATALOG.find((item) => item.slug === bird.slug);
-            const label = app ? app.title : bird.slug.replace(/_/g, " ");
+            const label = bird.slug.replace(/[_-]/g, " ");
 
             if (app) {
               return (
