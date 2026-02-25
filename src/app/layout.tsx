@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "BirdFinds",
+  title: "Birdpile",
   description: "Discover the world of birds.",
   openGraph: {
-    title: "BirdFinds",
+    title: "Birdpile",
     description: "Discover the world of birds.",
-    siteName: "BirdFinds",
+    siteName: "Birdpile",
     type: "website",
   },
 };
