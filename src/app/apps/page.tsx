@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { BIRD_CATALOG } from "@/lib/birds";
+import { APP_CATALOG } from "@/lib/birds";
 
 export default function AppsPage() {
   return (
@@ -8,7 +8,7 @@ export default function AppsPage() {
       <header className="py-2 flex justify-center">
         <div className="relative w-16 h-16">
           <Image
-            src="/logo.svg"
+            src="/logo.png"
             alt="BirdFinds Logo"
             fill
             className="object-contain"
@@ -24,49 +24,23 @@ export default function AppsPage() {
           </h1>
         </div>
         <div className="grid grid-cols-3 gap-8">
-          {BIRD_CATALOG.map((bird) => {
-            const isCardinal = bird.slug === "cardinal";
-
-            if (isCardinal) {
-              return (
-                <a
-                  key={bird.slug}
-                  href="https://birdfinds.com"
-                  className="block relative aspect-square w-full group overflow-hidden"
-                  title="Open Birdfinds"
-                >
-                  <Image
-                    src={`/birds/${bird.filename}`}
-                    alt={bird.slug}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-110"
-                    sizes="(max-width: 768px) 33vw, 33vw"
-                  />
-                  <div className="absolute bottom-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <span className="text-white text-[10px] font-mono font-medium uppercase tracking-widest drop-shadow-md">
-                      {bird.slug.replace(/_/g, " ")}
-                    </span>
-                  </div>
-                </a>
-              );
-            }
-
+          {APP_CATALOG.map((app) => {
             return (
               <Link
-                key={bird.slug}
-                href={`/apps/${bird.slug}`}
+                key={app.slug}
+                href={`/apps/${app.slug}`}
                 className="block relative aspect-square w-full group overflow-hidden"
               >
                 <Image
-                  src={`/birds/${bird.filename}`}
-                  alt={bird.slug}
+                  src={`/birds/${app.filename}`}
+                  alt={app.title}
                   fill
                   className="object-cover transition-transform duration-500 group-hover:scale-110"
                   sizes="(max-width: 768px) 33vw, 33vw"
                 />
                 <div className="absolute bottom-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                   <span className="text-white text-[10px] font-mono font-medium uppercase tracking-widest drop-shadow-md">
-                    {bird.slug.replace(/_/g, " ")}
+                    {app.title}
                   </span>
                 </div>
               </Link>
