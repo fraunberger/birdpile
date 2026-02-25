@@ -11,7 +11,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <header className="flex justify-center">
+      <header className="py-2 flex justify-center">
         <div className="relative w-112 h-28">
           <Image
             src="/logo.png"
@@ -27,7 +27,32 @@ export default function HomePage() {
         <div className="grid grid-cols-3 gap-8">
           {prioritizedBirds.map((bird) => {
             const app = APP_CATALOG.find((item) => item.slug === bird.slug);
+            const isCardinal = bird.slug === "cardinal";
             const label = bird.slug.replace(/[_-]/g, " ");
+
+            if (isCardinal) {
+              return (
+                <a
+                  key={bird.slug}
+                  href="https://birdfinds.com"
+                  className="block relative aspect-square w-full group overflow-hidden"
+                  title="Open birdfinds.com"
+                >
+                  <Image
+                    src={`/birds/${bird.filename}`}
+                    alt={label}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-110"
+                    sizes="(max-width: 768px) 33vw, 33vw"
+                  />
+                  <div className="absolute bottom-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <span className="text-white text-[10px] font-mono font-medium uppercase tracking-widest drop-shadow-md">
+                      {label}
+                    </span>
+                  </div>
+                </a>
+              );
+            }
 
             if (app) {
               return (
