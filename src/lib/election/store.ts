@@ -31,7 +31,8 @@ class ElectionStore {
     }
 
     private async checkRetention(election: Election): Promise<Election | undefined> {
-        if (election.name.toLowerCase() === 'shots') return election;
+        const normalizedName = election.name.trim().toLowerCase();
+        if (normalizedName.startsWith('shots')) return election;
 
         const twoHours = 2 * 60 * 60 * 1000;
         if (Date.now() - election.createdAt > twoHours) {
