@@ -12,7 +12,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-white">
       <header className="flex justify-center">
-        <div className="relative w-56 h-56">
+        <div className="relative w-112 h-56">
           <Image
             src="/logo.png"
             alt="Birdpile Logo"
