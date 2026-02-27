@@ -3,6 +3,9 @@ import { determineCondorcetWinner } from "@/lib/election/condorcet";
 import { Election } from "@/lib/election/types";
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function POST(req: Request) {
     try {
         const body = await req.json();
@@ -81,5 +84,9 @@ export async function GET() {
             nominationCount: e.nominations.length,
             winnerName
         };
-    }));
+    }), {
+        headers: {
+            "Cache-Control": "no-store, max-age=0",
+        },
+    });
 }
