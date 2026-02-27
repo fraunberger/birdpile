@@ -24,7 +24,7 @@ export default function HomePage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 pb-12">
-        <div className="grid grid-cols-3 gap-8">
+        <div className="grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
           {prioritizedBirds.map((bird) => {
             const app = APP_CATALOG.find((item) => item.slug === bird.slug);
             const isCardinal = bird.slug === "cardinal";
