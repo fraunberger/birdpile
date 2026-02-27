@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
+const ATLANTA_CENTER = { latitude: 33.749, longitude: -84.388 };
+const ATLANTA_BIAS_RADIUS_METERS = 50000; // ~31 miles
 interface GooglePlace {
     name: string;
     formattedAddress?: string;
@@ -47,7 +49,14 @@ export async function GET(request: Request) {
                 'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel,places.photos,places.name,places.googleMapsUri'
             },
             body: JSON.stringify({
-                textQuery: query
+                textQuery: query,
+                regionCode: "US",
+                locationBias: {
+                    circle: {
+                        center: ATLANTA_CENTER,
+                        radius: ATLANTA_BIAS_RADIUS_METERS
+                    }
+                }
             })
         });
 
