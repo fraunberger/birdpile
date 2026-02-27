@@ -62,7 +62,8 @@ export function CreateElection({ onJoined }: { onJoined: (id: string) => void })
             setIsCreating(false);
             onJoined(election.id);
         } else {
-            alert("Failed to create");
+            const err = await res.json().catch(() => ({ error: "Failed to create election" }));
+            alert(err.error || "Failed to create election");
         }
         setLoading(false);
     };

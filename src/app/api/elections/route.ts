@@ -29,9 +29,16 @@ export async function POST(req: Request) {
 
         await store.createElection(election);
 
+        // Ensure the election is actually persisted before returning success.
+        const persisted = await store.getElection(id);
+        if (!persisted) {
+            throw new Error("Election create did not persist");
+        }
+
         return NextResponse.json(election);
-    } catch {
-        return NextResponse.json({ error: "Internal Error" }, { status: 500 });
+    } catch (error) {
+        console.error("Failed to create election:", error);
+        return NextResponse.json({ error: "Failed to create election. Please try again." }, { status: 500 });
     }
 }
 

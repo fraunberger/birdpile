@@ -46,9 +46,11 @@ export class SupabaseAdapter implements StorageAdapter {
 
             if (error) {
                 console.error("Supabase Save Error:", error);
+                throw new Error(`Supabase save failed: ${error.message}`);
             }
         } catch (e) {
             console.error("Supabase Adapter Save Error:", e);
+            throw e;
         }
     }
 
