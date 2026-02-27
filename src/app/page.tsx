@@ -12,7 +12,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-white">
       <header className="py-2 flex justify-center">
-        <div className="relative w-112 h-28">
+        <div className="relative w-96 h-24 md:w-112 md:h-28">
           <Image
             src="/logo.png"
             alt="Birdpile Logo"
@@ -24,7 +24,7 @@ export default function HomePage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 pb-12">
-        <div className="grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-3 gap-6 lg:grid-cols-4">
           {prioritizedBirds.map((bird) => {
             const app = APP_CATALOG.find((item) => item.slug === bird.slug);
             const isCardinal = bird.slug === "cardinal";
