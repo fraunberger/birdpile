@@ -58,7 +58,7 @@ export default function HomePage() {
               return (
                 <Link
                   key={bird.slug}
-                  href={`/apps/${bird.slug}`}
+                  href={`/${bird.slug}`}
                   className="block relative aspect-square w-full group overflow-hidden"
                 >
                   <Image
