@@ -17,6 +17,7 @@ export interface StorageAdapter {
 // 0. Supabase Migration (New Priority)
 export class SupabaseAdapter implements StorageAdapter {
     type = "supabase";
+    private fileFallback = new FileAdapter();
 
     async getElection(id: string): Promise<Election | undefined> {
         try {
@@ -34,6 +35,10 @@ export class SupabaseAdapter implements StorageAdapter {
             return data?.data as Election || undefined;
         } catch (e) {
             console.error("Supabase Adapter Error:", e);
+            if (process.env.NODE_ENV !== "production") {
+                console.warn("Falling back to local file storage for getElection in development.");
+                return this.fileFallback.getElection(id);
+            }
             return undefined;
         }
     }
@@ -50,6 +55,11 @@ export class SupabaseAdapter implements StorageAdapter {
             }
         } catch (e) {
             console.error("Supabase Adapter Save Error:", e);
+            if (process.env.NODE_ENV !== "production") {
+                console.warn("Falling back to local file storage for saveElection in development.");
+                await this.fileFallback.saveElection(election);
+                return;
+            }
             throw e;
         }
     }
@@ -67,6 +77,10 @@ export class SupabaseAdapter implements StorageAdapter {
             return (data || []).map(row => row.data as Election);
         } catch (e) {
             console.error("Supabase Adapter List Error:", e);
+            if (process.env.NODE_ENV !== "production") {
+                console.warn("Falling back to local file storage for getAllElections in development.");
+                return this.fileFallback.getAllElections();
+            }
             return [];
         }
     }
@@ -76,6 +90,10 @@ export class SupabaseAdapter implements StorageAdapter {
             await supabase.from("elections").delete().eq("id", id);
         } catch (e) {
             console.error("Supabase Delete Error:", e);
+            if (process.env.NODE_ENV !== "production") {
+                console.warn("Falling back to local file storage for deleteElection in development.");
+                await this.fileFallback.deleteElection(id);
+            }
         }
     }
 }

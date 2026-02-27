@@ -38,7 +38,11 @@ export async function POST(req: Request) {
         return NextResponse.json(election);
     } catch (error) {
         console.error("Failed to create election:", error);
-        return NextResponse.json({ error: "Failed to create election. Please try again." }, { status: 500 });
+        const details =
+            process.env.NODE_ENV !== "production" && error instanceof Error
+                ? `Failed to create election: ${error.message}`
+                : "Failed to create election. Please try again.";
+        return NextResponse.json({ error: details }, { status: 500 });
     }
 }
 
