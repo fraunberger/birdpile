@@ -199,12 +199,13 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
         setIsSubmittingWriteIn(true);
         const safeCodeword = codeword.trim().toLowerCase();
 
-        // Find and remove old write-in from rankings if user already had one
-        const oldWriteIn = election?.nominations.find(
-            n => n.isWriteIn && n.nominatorName.toLowerCase() === username.toLowerCase()
+        // Remove whatever write-in is currently in rankings — could be the user's own
+        // OR someone else's they picked as their slot
+        const currentWriteInInRankings = election?.nominations.find(
+            n => n.isWriteIn && rankings.includes(n.id)
         );
-        if (oldWriteIn) {
-            setRankings(prev => prev.filter(id => id !== oldWriteIn.id));
+        if (currentWriteInInRankings) {
+            setRankings(prev => prev.filter(id => id !== currentWriteInInRankings.id));
         }
 
         const res = await fetch(`/api/elections/${electionId}/nominate`, {
@@ -513,28 +514,35 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
                                                 <div>
                                                     <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">Others wrote in:</p>
                                                     <div className="flex flex-wrap gap-2">
-                                                        {otherWriteIns.map(n => (
-                                                            <button
-                                                                key={n.id}
-                                                                onClick={() => {
-                                                                    if (rankings.includes(n.id)) return;
-                                                                    // If user has their own write-in, swap it out
-                                                                    if (userWriteIn) {
-                                                                        setRankings(prev => prev.filter(id => id !== userWriteIn.id));
-                                                                    }
-                                                                    setRankings(prev => [...prev, n.id]);
-                                                                }}
-                                                                disabled={rankings.includes(n.id)}
-                                                                className={`px-3 py-1.5 text-sm border font-medium transition-all ${
-                                                                    rankings.includes(n.id)
-                                                                        ? 'bg-purple-600 text-white border-purple-600 cursor-default'
-                                                                        : 'bg-white border-purple-300 text-purple-700 hover:bg-purple-50'
-                                                                }`}
-                                                            >
-                                                                {n.restaurantName}
-                                                                <span className="text-[10px] ml-1.5 opacity-60">by {n.nominatorName}</span>
-                                                            </button>
-                                                        ))}
+                                                        {otherWriteIns.map(n => {
+                                                            const isSelected = rankings.includes(n.id);
+                                                            return (
+                                                                <button
+                                                                    key={n.id}
+                                                                    onClick={() => {
+                                                                        if (isSelected) {
+                                                                            // Deselect — free up the slot
+                                                                            setRankings(prev => prev.filter(id => id !== n.id));
+                                                                            return;
+                                                                        }
+                                                                        // Swap out whatever write-in is currently in the slot
+                                                                        const currentSlot = election.nominations.find(nom => nom.isWriteIn && rankings.includes(nom.id));
+                                                                        if (currentSlot) {
+                                                                            setRankings(prev => prev.filter(id => id !== currentSlot.id));
+                                                                        }
+                                                                        setRankings(prev => [...prev, n.id]);
+                                                                    }}
+                                                                    className={`px-3 py-1.5 text-sm border font-medium transition-all ${
+                                                                        isSelected
+                                                                            ? 'bg-purple-600 text-white border-purple-600'
+                                                                            : 'bg-white border-purple-300 text-purple-700 hover:bg-purple-50'
+                                                                    }`}
+                                                                >
+                                                                    {n.restaurantName}
+                                                                    <span className="text-[10px] ml-1.5 opacity-60">by {n.nominatorName}</span>
+                                                                </button>
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             )}
@@ -546,7 +554,12 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
                                                     value={writeInText}
                                                     onChange={e => setWriteInText(e.target.value)}
                                                     onKeyDown={e => e.key === 'Enter' && submitWriteIn(writeInText)}
-                                                    placeholder={userWriteIn ? `Current: "${userWriteIn.restaurantName}" — type to replace` : 'Type a write-in...'}
+                                                    placeholder={(() => {
+                                                        const slotted = election.nominations.find(nom => nom.isWriteIn && rankings.includes(nom.id));
+                                                        if (!slotted) return 'Type a write-in...';
+                                                        if (slotted.nominatorName.toLowerCase() === username.toLowerCase()) return `Current: "${slotted.restaurantName}" — type to replace`;
+                                                        return `Slot taken by "${slotted.restaurantName}" — type to use your own instead`;
+                                                    })()}
                                                     className="flex-grow border border-purple-300 p-2 text-sm outline-none focus:ring-1 focus:ring-purple-400 placeholder:text-gray-300"
                                                 />
                                                 <button
