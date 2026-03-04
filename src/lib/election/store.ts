@@ -88,7 +88,15 @@ class ElectionStore {
         if (!election) return null;
 
         if (nomination.isWriteIn) {
-            election.nominations.push(nomination);
+            // Each user gets exactly one write-in slot — replace if they already have one
+            const existingWriteInIdx = election.nominations.findIndex(
+                n => n.isWriteIn && n.nominatorName.toLowerCase() === nomination.nominatorName.toLowerCase()
+            );
+            if (existingWriteInIdx >= 0) {
+                election.nominations[existingWriteInIdx] = nomination;
+            } else {
+                election.nominations.push(nomination);
+            }
         } else {
             const existingIdx = election.nominations.findIndex(n => n.nominatorName.toLowerCase() === nomination.nominatorName.toLowerCase() && !n.isWriteIn);
             if (existingIdx >= 0) {
