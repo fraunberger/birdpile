@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Election, Nomination } from '@/lib/election/types';
 import { Reorder } from "framer-motion";
 import { RestaurantSearch } from './RestaurantSearch';
+import { WinnerRevealAnimation } from './WinnerRevealAnimation';
 
 interface ExtendedElection extends Election {
     status: 'nomination' | 'voting' | 'completed' | 'cancelled';
@@ -44,9 +45,17 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
     const pollRef = useRef<NodeJS.Timeout>(null);
 
     // Local User State
-    // const [restaurant, setRestaurant] = useState(''); // REPLACED BY RICH DATA HANDLING
     const [rankings, setRankings] = useState<string[]>([]); // list of nomination IDs in order
     const [hasVoted, setHasVoted] = useState(false);
+
+    // Write-In State
+    const [writeInText, setWriteInText] = useState('');
+    const [isSubmittingWriteIn, setIsSubmittingWriteIn] = useState(false);
+
+    // Winner Animation State
+    const [showWinnerAnimation, setShowWinnerAnimation] = useState(false);
+    const [animationDone, setAnimationDone] = useState(false);
+    const prevStatusRef = useRef<string | null>(null);
 
     // Fetch Loop
     const [errorCount, setErrorCount] = useState(0);
@@ -113,6 +122,15 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
         }
     }, [election, username]);
 
+    // Trigger winner animation when election first reaches completed state
+    useEffect(() => {
+        if (!election) return;
+        if (election.status === 'completed' && !animationDone) {
+            setShowWinnerAnimation(true);
+        }
+        prevStatusRef.current = election.status;
+    }, [election?.status]);
+
     const handleJoin = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!username || !codeword) return;
@@ -175,6 +193,41 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
         }
     };
 
+
+    const submitWriteIn = async (name: string) => {
+        if (!name.trim()) return;
+        setIsSubmittingWriteIn(true);
+        const safeCodeword = codeword.trim().toLowerCase();
+
+        // Find and remove old write-in from rankings if user already had one
+        const oldWriteIn = election?.nominations.find(
+            n => n.isWriteIn && n.nominatorName.toLowerCase() === username.toLowerCase()
+        );
+        if (oldWriteIn) {
+            setRankings(prev => prev.filter(id => id !== oldWriteIn.id));
+        }
+
+        const res = await fetch(`/api/elections/${electionId}/nominate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                nominatorName: username,
+                restaurantName: name.trim(),
+                groupCodeword: safeCodeword,
+                isWriteIn: true,
+            })
+        });
+
+        if (res.ok) {
+            const nom = await res.json();
+            setRankings(prev => [...prev, nom.id]);
+            setWriteInText('');
+            fetchElection();
+        } else {
+            alert("Failed to submit write-in");
+        }
+        setIsSubmittingWriteIn(false);
+    };
 
     const submitVote = async () => {
         if (rankings.length === 0) return;
@@ -418,23 +471,110 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
 
                     <div className="grid md:grid-cols-2 gap-12">
                         {/* Candidates */}
-                        <div>
-                            <h3 className="text-sm font-bold uppercase text-gray-400 tracking-wider mb-4 border-b border-gray-200 pb-2">Available Options</h3>
-                            <div className="space-y-2">
-                                {election.nominations
-                                    .filter(n => !rankings.includes(n.id))
-                                    .map(n => (
-                                        <button
-                                            key={n.id}
-                                            onClick={() => toggleRank(n.id)}
-                                            className="w-full text-left bg-white hover:bg-gray-50 p-3 border border-gray-200 transition-all flex items-center justify-between group"
-                                        >
-                                            <div className="flex-grow pr-4">
-                                                {renderCandidateCard(n, true)}
+                        <div className="space-y-6">
+                            <div>
+                                <h3 className="text-sm font-bold uppercase text-gray-400 tracking-wider mb-4 border-b border-gray-200 pb-2">Available Options</h3>
+                                <div className="space-y-2">
+                                    {election.nominations
+                                        .filter(n => !n.isWriteIn && !rankings.includes(n.id))
+                                        .map(n => (
+                                            <button
+                                                key={n.id}
+                                                onClick={() => toggleRank(n.id)}
+                                                className="w-full text-left bg-white hover:bg-gray-50 p-3 border border-gray-200 transition-all flex items-center justify-between group"
+                                            >
+                                                <div className="flex-grow pr-4">
+                                                    {renderCandidateCard(n, true)}
+                                                </div>
+                                                <span className="text-gray-300 group-hover:text-black text-xl leading-none">+</span>
+                                            </button>
+                                        ))}
+                                </div>
+                            </div>
+
+                            {/* Write-In Section */}
+                            <div>
+                                <h3 className="text-sm font-bold uppercase text-purple-600 tracking-wider mb-1 border-b border-purple-100 pb-2">
+                                    ✏️ Your Write-In Slot
+                                </h3>
+                                <p className="text-xs text-gray-400 mb-3">One write-in per person. Pick a suggestion or type your own.</p>
+
+                                {/* Suggestions from other voters */}
+                                {(() => {
+                                    const otherWriteIns = election.nominations.filter(
+                                        n => n.isWriteIn && n.nominatorName.toLowerCase() !== username.toLowerCase()
+                                    );
+                                    const userWriteIn = election.nominations.find(
+                                        n => n.isWriteIn && n.nominatorName.toLowerCase() === username.toLowerCase()
+                                    );
+                                    return (
+                                        <div className="space-y-3">
+                                            {otherWriteIns.length > 0 && (
+                                                <div>
+                                                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">Others wrote in:</p>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {otherWriteIns.map(n => (
+                                                            <button
+                                                                key={n.id}
+                                                                onClick={() => {
+                                                                    if (rankings.includes(n.id)) return;
+                                                                    // If user has their own write-in, swap it out
+                                                                    if (userWriteIn) {
+                                                                        setRankings(prev => prev.filter(id => id !== userWriteIn.id));
+                                                                    }
+                                                                    setRankings(prev => [...prev, n.id]);
+                                                                }}
+                                                                disabled={rankings.includes(n.id)}
+                                                                className={`px-3 py-1.5 text-sm border font-medium transition-all ${
+                                                                    rankings.includes(n.id)
+                                                                        ? 'bg-purple-600 text-white border-purple-600 cursor-default'
+                                                                        : 'bg-white border-purple-300 text-purple-700 hover:bg-purple-50'
+                                                                }`}
+                                                            >
+                                                                {n.restaurantName}
+                                                                <span className="text-[10px] ml-1.5 opacity-60">by {n.nominatorName}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Own write-in input */}
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={writeInText}
+                                                    onChange={e => setWriteInText(e.target.value)}
+                                                    onKeyDown={e => e.key === 'Enter' && submitWriteIn(writeInText)}
+                                                    placeholder={userWriteIn ? `Current: "${userWriteIn.restaurantName}" — type to replace` : 'Type a write-in...'}
+                                                    className="flex-grow border border-purple-300 p-2 text-sm outline-none focus:ring-1 focus:ring-purple-400 placeholder:text-gray-300"
+                                                />
+                                                <button
+                                                    onClick={() => submitWriteIn(writeInText)}
+                                                    disabled={!writeInText.trim() || isSubmittingWriteIn}
+                                                    className="px-4 py-2 bg-purple-600 text-white text-sm font-bold uppercase tracking-wide hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                >
+                                                    {isSubmittingWriteIn ? '...' : 'Add'}
+                                                </button>
                                             </div>
-                                            <span className="text-gray-300 group-hover:text-black text-xl leading-none">+</span>
-                                        </button>
-                                    ))}
+
+                                            {/* Show ranked write-ins */}
+                                            {election.nominations
+                                                .filter(n => n.isWriteIn && rankings.includes(n.id))
+                                                .map(n => (
+                                                    <div key={n.id} className="flex items-center gap-2 text-sm text-purple-700 bg-purple-50 border border-purple-200 px-3 py-2">
+                                                        <span className="font-medium">{n.restaurantName}</span>
+                                                        <span className="text-xs text-purple-400">(write-in)</span>
+                                                        <button
+                                                            onClick={() => toggleRank(n.id)}
+                                                            className="ml-auto text-gray-300 hover:text-red-500 text-lg leading-none"
+                                                        >×</button>
+                                                    </div>
+                                                ))
+                                            }
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
 
@@ -524,8 +664,22 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
                 </div>
             )}
 
+            {/* WINNER ANIMATION (plays once when completed phase is first seen) */}
+            {election.status === 'completed' && showWinnerAnimation && !animationDone && election.winner && (
+                <div className="max-w-sm mx-auto py-8">
+                    <WinnerRevealAnimation
+                        nominations={election.nominations}
+                        winnerId={election.winner}
+                        onComplete={() => {
+                            setAnimationDone(true);
+                            setShowWinnerAnimation(false);
+                        }}
+                    />
+                </div>
+            )}
+
             {/* RESULTS PHASE */}
-            {election.status === 'completed' && (
+            {election.status === 'completed' && (!showWinnerAnimation || animationDone) && (
                 <div className="text-center py-12">
                     <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-6">Voting Complete</h2>
 
