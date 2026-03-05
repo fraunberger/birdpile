@@ -2,6 +2,7 @@ import { store } from "@/lib/election/store";
 import { determineCondorcetWinner } from "@/lib/election/condorcet";
 import { Election } from "@/lib/election/types";
 import { NextResponse } from "next/server";
+import { hashCodeword } from "@/lib/election/auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -17,10 +18,13 @@ export async function POST(req: Request) {
         }
 
         const id = Math.random().toString(36).substring(2, 9); // Simple ID
+
+        const hashedCodeword = await hashCodeword(groupCodeword);
+
         const election: Election = {
             id,
             name,
-            groupCodeword,
+            groupCodeword: hashedCodeword,
             adminName,
             ballotVisibility: safeBallotVisibility,
             voteStartTime,
