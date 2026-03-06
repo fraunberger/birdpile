@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { BlackjackTrainer } from "@/components/blackjack-trainer/BlackjackTrainer";
 import { BillSplitter } from "@/components/bill-splitter/BillSplitter";
 import { RestaurantVotingApp } from "@/components/pileated-woodpecker-election/RestaurantVotingApp";
+import { BirdLog } from "@/components/bird-log/BirdLog";
+import { BIRD_LOG_BY_SLUG } from "@/lib/birds";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -15,6 +17,17 @@ export default async function BirdAppPage({
   const isBillSplitter = slug === "australian_magpie";
   const isBlackjack = slug === "eastern_bluebird" || slug === "eastern_blue_bird";
   const isElection = slug === "pileated_woodpecker" || slug === "pileated-woodpecker";
+  const birdLog = BIRD_LOG_BY_SLUG[slug];
+
+  if (birdLog) {
+    return (
+      <BirdLog
+        category={birdLog.category}
+        birdSlug={slug}
+        birdImage={birdLog.filename}
+      />
+    );
+  }
 
   if (isBillSplitter) {
     return (

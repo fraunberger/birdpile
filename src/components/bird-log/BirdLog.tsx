@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
+import { ItemDetailModal } from './ItemDetailModal';
+import { getSavedCount } from '@/lib/pile';
 
 type Category = string;
 
@@ -47,6 +49,16 @@ export function BirdLog({ category, birdSlug, birdImage }: BirdLogProps) {
   const [items, setItems] = useState<ConsumableItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<'date' | 'rating'>('date');
+  const [selectedItem, setSelectedItem] = useState<ConsumableItem | null>(null);
+  const [savedCount, setSavedCount] = useState(0);
+
+  useEffect(() => {
+    setSavedCount(getSavedCount());
+  }, []);
+
+  const refreshSavedCount = useCallback(() => {
+    setSavedCount(getSavedCount());
+  }, []);
 
   useEffect(() => {
     async function fetchItems() {
@@ -122,6 +134,12 @@ export function BirdLog({ category, birdSlug, birdImage }: BirdLogProps) {
               </span>
             </div>
           </div>
+          <Link
+            href="/my-pile"
+            className="text-[10px] uppercase tracking-widest text-neutral-500 hover:text-neutral-900 border border-neutral-300 hover:border-neutral-600 px-2 py-1 transition-colors"
+          >
+            My Pile{savedCount > 0 ? ` (${savedCount})` : ''}
+          </Link>
         </header>
 
         <div className="flex items-center gap-4 mb-8">
@@ -190,7 +208,11 @@ export function BirdLog({ category, birdSlug, birdImage }: BirdLogProps) {
                 </thead>
                 <tbody>
                   {sorted.map((item) => (
-                    <tr key={item.id} className="hover:bg-neutral-50">
+                    <tr
+                      key={item.id}
+                      className="hover:bg-neutral-50 cursor-pointer"
+                      onClick={() => setSelectedItem(item)}
+                    >
                       <td className="px-3 py-2 border-b border-r border-neutral-200 font-medium">
                         {item.title}
                       </td>
@@ -212,6 +234,15 @@ export function BirdLog({ category, birdSlug, birdImage }: BirdLogProps) {
           — END —
         </footer>
       </div>
+
+      {selectedItem && config && (
+        <ItemDetailModal
+          item={selectedItem}
+          config={config}
+          onClose={() => setSelectedItem(null)}
+          onSaveChange={refreshSavedCount}
+        />
+      )}
     </div>
   );
 }

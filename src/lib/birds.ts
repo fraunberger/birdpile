@@ -68,3 +68,25 @@ export const BIRD_FILENAME_BY_SLUG: Record<BirdSlug, string> = BIRD_CATALOG.redu
   },
   {} as Record<BirdSlug, string>
 );
+
+export const BIRD_LOG_CATALOG = [
+  { slug: "cedar_waxwing", filename: "cedar_waxwing.jpeg", category: "movie" },
+  { slug: "american_robin", filename: "american_robin.jpeg", category: "tv" },
+  { slug: "carolina_wren", filename: "carolina_wren.jpeg", category: "music" },
+  { slug: "california_quail", filename: "california_quail.png", category: "restaurant" },
+  { slug: "tufted_titmouse", filename: "tufted_titmouse.jpeg", category: "beer" },
+  { slug: "house_finch", filename: "house_finch.jpeg", category: "cooking" },
+  { slug: "northern_mockingbird", filename: "northern_mockingbird.png", category: "podcast" },
+  { slug: "dark_eyed_junco", filename: "dark_eyed_junco.jpeg", category: "book" },
+] as const;
+
+export type BirdLogSlug = (typeof BIRD_LOG_CATALOG)[number]["slug"];
+
+export const BIRD_LOG_BY_SLUG: Record<string, { filename: string; category: string }> =
+  BIRD_LOG_CATALOG.reduce(
+    (acc, bird) => {
+      acc[bird.slug] = { filename: bird.filename, category: bird.category };
+      return acc;
+    },
+    {} as Record<string, { filename: string; category: string }>
+  );
