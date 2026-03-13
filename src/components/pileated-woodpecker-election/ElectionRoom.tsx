@@ -388,7 +388,7 @@ export function ElectionRoom({ electionId, onExit }: { electionId: string, onExi
 
             {/* VOTING PHASE */}
             {election.status === 'voting' && !hasVoted && (
-                <div className="max-w-4xl mx-auto">
+                <div className="max-w-4xl mx-auto pb-28">
                     <div className="mb-8 text-center">
                         <h2 className="text-3xl font-bold uppercase mb-2">Rank Candidates</h2>
                         <p className="text-gray-500">Tap to add to your ranking. Drag or use arrows to reorder.</p>
@@ -477,7 +477,7 @@ export function ElectionRoom({ electionId, onExit }: { electionId: string, onExi
 
             {/* Submit Vote */}
             {!hasVoted && election.status === 'voting' && (
-                <div className="fixed bottom-0 left-0 right-0 p-4 border-t border-black bg-white/95 backdrop-blur-sm shadow-md">
+                <div className="fixed bottom-0 left-0 right-0 z-10 p-4 border-t border-black bg-white/95 backdrop-blur-sm shadow-md">
                     <button
                         onClick={submitVote}
                         disabled={rankings.length === 0}
