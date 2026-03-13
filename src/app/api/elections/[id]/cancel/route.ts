@@ -1,4 +1,5 @@
 import { store } from "@/lib/election/store";
+import { verifyCodeword } from "@/lib/election/auth";
 import { NextResponse } from "next/server";
 
 export async function POST(
@@ -12,7 +13,8 @@ export async function POST(
     const election = await store.getElection(id);
     if (!election) return NextResponse.json({ error: "Not Found" }, { status: 404 });
 
-    if (!groupCodeword || election.groupCodeword !== groupCodeword) {
+    const isValid = await verifyCodeword(groupCodeword, election.groupCodeword);
+    if (!groupCodeword || !isValid) {
         return NextResponse.json({ error: "Invalid Codeword" }, { status: 403 });
     }
 

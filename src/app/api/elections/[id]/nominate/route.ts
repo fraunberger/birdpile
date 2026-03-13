@@ -1,4 +1,5 @@
 import { store } from "@/lib/election/store";
+import { verifyCodeword } from "@/lib/election/auth";
 import { NextResponse } from "next/server";
 
 export async function POST(
@@ -12,7 +13,8 @@ export async function POST(
     const election = await store.getElection(id);
     if (!election) return NextResponse.json({ error: "Not Found" }, { status: 404 });
 
-    if (election.groupCodeword !== groupCodeword) {
+    const isValid = await verifyCodeword(groupCodeword, election.groupCodeword);
+    if (!isValid) {
         return NextResponse.json({ error: "Invalid Codeword" }, { status: 403 });
     }
 
@@ -46,7 +48,8 @@ export async function DELETE(
     const election = await store.getElection(id);
     if (!election) return NextResponse.json({ error: "Not Found" }, { status: 404 });
 
-    if (election.groupCodeword !== groupCodeword) {
+    const isValidDelete = await verifyCodeword(groupCodeword, election.groupCodeword);
+    if (!isValidDelete) {
         return NextResponse.json({ error: "Invalid Codeword" }, { status: 403 });
     }
 
