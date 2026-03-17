@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface ElectionSummary {
     id: string;
@@ -25,22 +25,24 @@ export function CreateElection({ onJoined }: { onJoined: (id: string) => void })
     const [codeword, setCodeword] = useState('');
     const [ballotVisibility, setBallotVisibility] = useState<'secret' | 'open'>('secret');
     const [loading, setLoading] = useState(false);
+    const [loadingElections, setLoadingElections] = useState(true);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    const fetchElections = useCallback(() => {
-        fetch('/api/elections')
-            .then(res => res.json())
-            .then(data => setElections(data))
-            .catch(err => console.error(err));
-    }, []);
-
     useEffect(() => {
+        let cancelled = false;
+        const fetchElections = () => {
+            fetch('/api/elections')
+                .then(res => res.json())
+                .then(data => { if (!cancelled) { setElections(data); setLoadingElections(false); } })
+                .catch(err => { console.error(err); if (!cancelled) setLoadingElections(false); });
+        };
         fetchElections();
         pollRef.current = setInterval(fetchElections, 5000);
         return () => {
+            cancelled = true;
             if (pollRef.current) clearInterval(pollRef.current);
         };
-    }, [fetchElections]);
+    }, []);
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -128,6 +130,15 @@ export function CreateElection({ onJoined }: { onJoined: (id: string) => void })
                         <button type="submit" disabled={loading} className="flex-1 py-3 font-bold bg-black text-white hover:bg-gray-900 transition-colors disabled:opacity-50 uppercase text-sm tracking-wide">Create</button>
                     </div>
                 </form>
+            </div>
+        );
+    }
+
+    if (loadingElections) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 space-y-4">
+                <div className="w-8 h-8 border-2 border-gray-300 border-t-black rounded-full animate-spin" />
+                <p className="text-sm font-bold uppercase tracking-wider text-gray-400">Loading Elections...</p>
             </div>
         );
     }
