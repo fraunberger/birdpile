@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface ElectionSummary {
     id: string;
@@ -16,7 +16,6 @@ interface ElectionSummary {
 export function CreateElection({ onJoined }: { onJoined: (id: string) => void }) {
     const [elections, setElections] = useState<ElectionSummary[]>([]);
     const [isCreating, setIsCreating] = useState(false);
-    const [refreshKey, setRefreshKey] = useState(0);
 
     // Form State
     const [name, setName] = useState('');
@@ -26,13 +25,22 @@ export function CreateElection({ onJoined }: { onJoined: (id: string) => void })
     const [codeword, setCodeword] = useState('');
     const [ballotVisibility, setBallotVisibility] = useState<'secret' | 'open'>('secret');
     const [loading, setLoading] = useState(false);
+    const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    useEffect(() => {
+    const fetchElections = useCallback(() => {
         fetch('/api/elections')
             .then(res => res.json())
             .then(data => setElections(data))
             .catch(err => console.error(err));
-    }, [refreshKey]);
+    }, []);
+
+    useEffect(() => {
+        fetchElections();
+        pollRef.current = setInterval(fetchElections, 5000);
+        return () => {
+            if (pollRef.current) clearInterval(pollRef.current);
+        };
+    }, [fetchElections]);
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
