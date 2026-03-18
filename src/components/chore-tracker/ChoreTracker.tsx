@@ -85,7 +85,11 @@ export function ChoreTracker() {
     try {
       const res = await fetch("/api/chores");
       const text = await res.text();
-      if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
+      if (!res.ok) {
+        let msg = `HTTP ${res.status}`;
+        try { msg = JSON.parse(text).error || msg; } catch { msg = text || msg; }
+        throw new Error(msg);
+      }
       const data = text ? JSON.parse(text) : [];
       setChores(data);
       setLoadError(null);
