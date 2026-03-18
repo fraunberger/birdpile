@@ -84,8 +84,9 @@ export function ChoreTracker() {
   const fetchChores = useCallback(async () => {
     try {
       const res = await fetch("/api/chores");
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to load");
+      const text = await res.text();
+      if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
+      const data = text ? JSON.parse(text) : [];
       setChores(data);
       setLoadError(null);
     } catch (e) {
