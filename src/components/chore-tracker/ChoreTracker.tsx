@@ -21,34 +21,56 @@ function getDaysUntilDue(lastDoneAt: string | null, frequencyDays: number): numb
 }
 
 function formatFrequency(days: number): string {
-  if (days % 30 === 0) return `every ${days / 30} month${days / 30 === 1 ? "" : "s"}`;
-  if (days % 7 === 0) return `every ${days / 7} week${days / 7 === 1 ? "" : "s"}`;
-  return `every ${days} day${days === 1 ? "" : "s"}`;
+  if (days % 30 === 0) return `${days / 30}mo`;
+  if (days % 7 === 0) return `${days / 7}wk`;
+  return `${days}d`;
 }
 
-function StatusBadge({ daysUntilDue }: { daysUntilDue: number | null }) {
-  if (daysUntilDue === null) {
-    return <span className="text-xs text-gray-400 font-mono">never done</span>;
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "—";
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function NextDueCell({ daysUntilDue, lastDoneAt, frequencyDays }: {
+  daysUntilDue: number | null;
+  lastDoneAt: string | null;
+  frequencyDays: number;
+}) {
+  if (!lastDoneAt) {
+    return <span className="text-gray-400">—</span>;
   }
+
+  const dueDate = new Date(lastDoneAt);
+  dueDate.setDate(dueDate.getDate() + frequencyDays);
+  const dateLabel = dueDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+  if (daysUntilDue === null) return <span className="text-gray-400">—</span>;
+
   if (daysUntilDue < 0) {
     return (
-      <span className="text-xs text-red-600 font-mono font-bold">
-        {Math.abs(daysUntilDue)}d overdue
+      <span className="text-red-600 font-medium">
+        {dateLabel} <span className="text-xs">({Math.abs(daysUntilDue)}d ago)</span>
       </span>
     );
   }
   if (daysUntilDue === 0) {
-    return <span className="text-xs text-orange-500 font-mono font-bold">due today</span>;
+    return <span className="text-orange-500 font-medium">{dateLabel} (today)</span>;
   }
   if (daysUntilDue <= 7) {
-    return <span className="text-xs text-amber-600 font-mono">due in {daysUntilDue}d</span>;
+    return <span className="text-amber-600">{dateLabel} <span className="text-xs">({daysUntilDue}d)</span></span>;
   }
-  return <span className="text-xs text-green-700 font-mono">due in {daysUntilDue}d</span>;
+  return <span className="text-gray-700">{dateLabel} <span className="text-xs text-gray-400">({daysUntilDue}d)</span></span>;
 }
 
 export function ChoreTracker() {
   const [chores, setChores] = useState<Chore[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [newName, setNewName] = useState("");
   const [newFreqNum, setNewFreqNum] = useState("1");
@@ -60,10 +82,17 @@ export function ChoreTracker() {
   const [deleting, setDeleting] = useState<string | null>(null);
 
   const fetchChores = useCallback(async () => {
-    const res = await fetch("/api/chores");
-    const data = await res.json();
-    setChores(data);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/chores");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to load");
+      setChores(data);
+      setLoadError(null);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Failed to load chores");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -96,11 +125,9 @@ export function ChoreTracker() {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || !newFreqNum) return;
-
     setAdding(true);
     const multiplier = newFreqUnit === "months" ? 30 : newFreqUnit === "weeks" ? 7 : 1;
     const frequency_days = parseInt(newFreqNum) * multiplier;
-
     await fetch("/api/chores", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -110,7 +137,6 @@ export function ChoreTracker() {
         last_done_at: newLastDone || null,
       }),
     });
-
     setNewName("");
     setNewFreqNum("1");
     setNewFreqUnit("months");
@@ -120,99 +146,117 @@ export function ChoreTracker() {
   };
 
   return (
-    <div className="max-w-xl mx-auto">
-      <h1 className="text-2xl font-bold font-mono mb-1">Chore Tracker</h1>
-      <p className="text-sm text-gray-500 font-mono mb-6">Monthly chore tracker</p>
+    <div className="max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold font-mono mb-6">Chore Tracker</h1>
 
-      {loading ? (
-        <p className="text-gray-400 font-mono text-sm">Loading...</p>
-      ) : sortedChores.length === 0 ? (
-        <p className="text-gray-400 font-mono text-sm">No chores yet. Add one below.</p>
-      ) : (
-        <div className="divide-y divide-gray-100">
-          {sortedChores.map((chore) => {
-            const daysUntilDue = getDaysUntilDue(chore.last_done_at, chore.frequency_days);
-            return (
-              <div key={chore.id} className="py-3 flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="font-mono font-medium text-sm">{chore.name}</div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-gray-400 font-mono">
-                      {formatFrequency(chore.frequency_days)}
-                    </span>
-                    <span className="text-gray-300">·</span>
-                    <StatusBadge daysUntilDue={daysUntilDue} />
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleMarkDone(chore.id)}
-                  disabled={completing === chore.id}
-                  className="flex items-center gap-1 text-xs font-mono px-2 py-1 border border-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 shrink-0"
-                  title="Mark done"
-                >
-                  <Check size={12} />
-                  done
-                </button>
-                <button
-                  onClick={() => handleDelete(chore.id)}
-                  disabled={deleting === chore.id}
-                  className="text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40 shrink-0"
-                  title="Delete"
-                >
-                  <Trash2 size={15} />
-                </button>
-              </div>
-            );
-          })}
-        </div>
+      {loading && <p className="text-gray-400 font-mono text-sm">Loading...</p>}
+
+      {loadError && (
+        <p className="text-red-600 font-mono text-sm">Error: {loadError}</p>
+      )}
+
+      {!loading && !loadError && (
+        <table className="w-full text-sm font-mono border-collapse">
+          <thead>
+            <tr className="border-b-2 border-black text-left">
+              <th className="pb-2 pr-4 font-semibold">Chore</th>
+              <th className="pb-2 pr-4 font-semibold">Every</th>
+              <th className="pb-2 pr-4 font-semibold">Last Done</th>
+              <th className="pb-2 pr-4 font-semibold">Next Due</th>
+              <th className="pb-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {sortedChores.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-4 text-gray-400">
+                  No chores yet. Add one below.
+                </td>
+              </tr>
+            ) : (
+              sortedChores.map((chore) => {
+                const daysUntilDue = getDaysUntilDue(chore.last_done_at, chore.frequency_days);
+                return (
+                  <tr key={chore.id} className="border-b border-gray-100">
+                    <td className="py-2 pr-4 font-medium">{chore.name}</td>
+                    <td className="py-2 pr-4 text-gray-500">{formatFrequency(chore.frequency_days)}</td>
+                    <td className="py-2 pr-4 text-gray-500">{formatDate(chore.last_done_at)}</td>
+                    <td className="py-2 pr-4">
+                      <NextDueCell
+                        daysUntilDue={daysUntilDue}
+                        lastDoneAt={chore.last_done_at}
+                        frequencyDays={chore.frequency_days}
+                      />
+                    </td>
+                    <td className="py-2">
+                      <div className="flex items-center gap-2 justify-end">
+                        <button
+                          onClick={() => handleMarkDone(chore.id)}
+                          disabled={completing === chore.id}
+                          className="flex items-center gap-1 text-xs px-2 py-1 border border-black hover:bg-black hover:text-white transition-colors disabled:opacity-40"
+                        >
+                          <Check size={11} />
+                          done
+                        </button>
+                        <button
+                          onClick={() => handleDelete(chore.id)}
+                          disabled={deleting === chore.id}
+                          className="text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
       )}
 
       <form onSubmit={handleAdd} className="mt-8 border-t border-gray-200 pt-6">
-        <div className="text-xs font-mono text-gray-500 uppercase tracking-wide mb-3">
-          Add chore
-        </div>
-        <div className="flex flex-col gap-2">
+        <div className="text-xs font-mono text-gray-500 uppercase tracking-wide mb-3">Add chore</div>
+        <div className="flex flex-wrap gap-2 items-end">
           <input
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Chore name"
-            className="border border-gray-300 font-mono text-sm px-3 py-2 w-full focus:outline-none focus:border-black"
+            className="border border-gray-300 font-mono text-sm px-3 py-2 focus:outline-none focus:border-black w-48"
           />
-          <div className="flex gap-2">
-            <input
-              type="number"
-              min="1"
-              value={newFreqNum}
-              onChange={(e) => setNewFreqNum(e.target.value)}
-              className="border border-gray-300 font-mono text-sm px-3 py-2 w-20 focus:outline-none focus:border-black"
-            />
-            <select
-              value={newFreqUnit}
-              onChange={(e) => setNewFreqUnit(e.target.value as "days" | "weeks" | "months")}
-              className="border border-gray-300 font-mono text-sm px-3 py-2 focus:outline-none focus:border-black flex-1"
-            >
-              <option value="days">days</option>
-              <option value="weeks">weeks</option>
-              <option value="months">months</option>
-            </select>
-          </div>
+          <input
+            type="number"
+            min="1"
+            value={newFreqNum}
+            onChange={(e) => setNewFreqNum(e.target.value)}
+            className="border border-gray-300 font-mono text-sm px-3 py-2 focus:outline-none focus:border-black w-16"
+          />
+          <select
+            value={newFreqUnit}
+            onChange={(e) => setNewFreqUnit(e.target.value as "days" | "weeks" | "months")}
+            className="border border-gray-300 font-mono text-sm px-3 py-2 focus:outline-none focus:border-black"
+          >
+            <option value="days">days</option>
+            <option value="weeks">weeks</option>
+            <option value="months">months</option>
+          </select>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-mono text-gray-400">Last done (optional)</label>
+            <label className="text-xs font-mono text-gray-400">Last done</label>
             <input
               type="date"
               value={newLastDone}
               onChange={(e) => setNewLastDone(e.target.value)}
-              className="border border-gray-300 font-mono text-sm px-3 py-2 w-full focus:outline-none focus:border-black"
+              className="border border-gray-300 font-mono text-sm px-3 py-2 focus:outline-none focus:border-black"
             />
           </div>
           <button
             type="submit"
             disabled={adding || !newName.trim()}
-            className="flex items-center justify-center gap-2 font-mono text-sm border border-black px-4 py-2 hover:bg-black hover:text-white transition-colors disabled:opacity-40"
+            className="flex items-center gap-1 font-mono text-sm border border-black px-4 py-2 hover:bg-black hover:text-white transition-colors disabled:opacity-40"
           >
-            <Plus size={14} />
-            Add chore
+            <Plus size={13} />
+            Add
           </button>
         </div>
       </form>
