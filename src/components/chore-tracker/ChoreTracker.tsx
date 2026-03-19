@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Trash2, Check, Plus } from "lucide-react";
+import { Trash2, Check, Plus, Pencil, X } from "lucide-react";
 
 type Chore = {
   id: string;
@@ -10,6 +10,20 @@ type Chore = {
   last_done_at: string | null;
   created_at: string;
 };
+
+type FreqUnit = "days" | "weeks" | "months";
+
+function toFreqParts(days: number): { num: number; unit: FreqUnit } {
+  if (days % 30 === 0) return { num: days / 30, unit: "months" };
+  if (days % 7 === 0) return { num: days / 7, unit: "weeks" };
+  return { num: days, unit: "days" };
+}
+
+function toDays(num: number, unit: FreqUnit): number {
+  if (unit === "months") return num * 30;
+  if (unit === "weeks") return num * 7;
+  return num;
+}
 
 function getDaysUntilDue(lastDoneAt: string | null, frequencyDays: number): number | null {
   if (!lastDoneAt) return null;
@@ -21,9 +35,8 @@ function getDaysUntilDue(lastDoneAt: string | null, frequencyDays: number): numb
 }
 
 function formatFrequency(days: number): string {
-  if (days % 30 === 0) return `${days / 30}mo`;
-  if (days % 7 === 0) return `${days / 7}wk`;
-  return `${days}d`;
+  const { num, unit } = toFreqParts(days);
+  return `${num}${unit[0]}`;
 }
 
 function formatDate(dateStr: string | null): string {
@@ -41,31 +54,31 @@ function NextDueCell({ daysUntilDue, lastDoneAt, frequencyDays }: {
   lastDoneAt: string | null;
   frequencyDays: number;
 }) {
-  if (!lastDoneAt) {
-    return <span className="text-gray-400">—</span>;
-  }
+  if (!lastDoneAt || daysUntilDue === null) return <span className="text-gray-400">—</span>;
 
   const dueDate = new Date(lastDoneAt);
   dueDate.setDate(dueDate.getDate() + frequencyDays);
   const dateLabel = dueDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
-  if (daysUntilDue === null) return <span className="text-gray-400">—</span>;
-
   if (daysUntilDue < 0) {
-    return (
-      <span className="text-red-600 font-medium">
-        {dateLabel} <span className="text-xs">({Math.abs(daysUntilDue)}d ago)</span>
-      </span>
-    );
+    return <span className="text-red-600 font-medium">{dateLabel} <span className="text-xs">({Math.abs(daysUntilDue)}d ago)</span></span>;
   }
   if (daysUntilDue === 0) {
-    return <span className="text-orange-500 font-medium">{dateLabel} (today)</span>;
+    return <span className="text-orange-500 font-medium">{dateLabel} <span className="text-xs">(today)</span></span>;
   }
   if (daysUntilDue <= 7) {
     return <span className="text-amber-600">{dateLabel} <span className="text-xs">({daysUntilDue}d)</span></span>;
   }
   return <span className="text-gray-700">{dateLabel} <span className="text-xs text-gray-400">({daysUntilDue}d)</span></span>;
 }
+
+type EditState = {
+  id: string;
+  name: string;
+  freqNum: string;
+  freqUnit: FreqUnit;
+  lastDone: string;
+};
 
 export function ChoreTracker() {
   const [chores, setChores] = useState<Chore[]>([]);
@@ -74,12 +87,14 @@ export function ChoreTracker() {
 
   const [newName, setNewName] = useState("");
   const [newFreqNum, setNewFreqNum] = useState("1");
-  const [newFreqUnit, setNewFreqUnit] = useState<"days" | "weeks" | "months">("months");
+  const [newFreqUnit, setNewFreqUnit] = useState<FreqUnit>("months");
   const [newLastDone, setNewLastDone] = useState("");
   const [adding, setAdding] = useState(false);
 
   const [completing, setCompleting] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [editing, setEditing] = useState<EditState | null>(null);
 
   const fetchChores = useCallback(async () => {
     try {
@@ -100,9 +115,7 @@ export function ChoreTracker() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchChores();
-  }, [fetchChores]);
+  useEffect(() => { fetchChores(); }, [fetchChores]);
 
   const sortedChores = [...chores].sort((a, b) => {
     const da = getDaysUntilDue(a.last_done_at, a.frequency_days);
@@ -127,18 +140,44 @@ export function ChoreTracker() {
     setDeleting(null);
   };
 
+  const startEdit = (chore: Chore) => {
+    const { num, unit } = toFreqParts(chore.frequency_days);
+    setEditing({
+      id: chore.id,
+      name: chore.name,
+      freqNum: String(num),
+      freqUnit: unit,
+      lastDone: chore.last_done_at ?? "",
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editing || !editing.name.trim() || !editing.freqNum) return;
+    setSaving(editing.id);
+    await fetch(`/api/chores/${editing.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: editing.name.trim(),
+        frequency_days: toDays(parseInt(editing.freqNum), editing.freqUnit),
+        last_done_at: editing.lastDone || null,
+      }),
+    });
+    setEditing(null);
+    await fetchChores();
+    setSaving(null);
+  };
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || !newFreqNum) return;
     setAdding(true);
-    const multiplier = newFreqUnit === "months" ? 30 : newFreqUnit === "weeks" ? 7 : 1;
-    const frequency_days = parseInt(newFreqNum) * multiplier;
     await fetch("/api/chores", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: newName.trim(),
-        frequency_days,
+        frequency_days: toDays(parseInt(newFreqNum), newFreqUnit),
         last_done_at: newLastDone || null,
       }),
     });
@@ -150,15 +189,14 @@ export function ChoreTracker() {
     setAdding(false);
   };
 
+  const inputCls = "border border-gray-300 font-mono text-sm px-2 py-1 focus:outline-none focus:border-black";
+
   return (
     <div className="max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold font-mono mb-6">Chore Tracker</h1>
 
       {loading && <p className="text-gray-400 font-mono text-sm">Loading...</p>}
-
-      {loadError && (
-        <p className="text-red-600 font-mono text-sm">Error: {loadError}</p>
-      )}
+      {loadError && <p className="text-red-600 font-mono text-sm">Error: {loadError}</p>}
 
       {!loading && !loadError && (
         <table className="w-full text-sm font-mono border-collapse">
@@ -174,24 +212,78 @@ export function ChoreTracker() {
           <tbody>
             {sortedChores.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-4 text-gray-400">
-                  No chores yet. Add one below.
-                </td>
+                <td colSpan={5} className="py-4 text-gray-400">No chores yet. Add one below.</td>
               </tr>
             ) : (
               sortedChores.map((chore) => {
+                const isEditing = editing?.id === chore.id;
                 const daysUntilDue = getDaysUntilDue(chore.last_done_at, chore.frequency_days);
+
+                if (isEditing && editing) {
+                  return (
+                    <tr key={chore.id} className="border-b border-gray-200 bg-gray-50">
+                      <td className="py-2 pr-2">
+                        <input
+                          className={inputCls + " w-full"}
+                          value={editing.name}
+                          onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                          autoFocus
+                        />
+                      </td>
+                      <td className="py-2 pr-2">
+                        <div className="flex gap-1">
+                          <input
+                            type="number"
+                            min="1"
+                            className={inputCls + " w-12"}
+                            value={editing.freqNum}
+                            onChange={(e) => setEditing({ ...editing, freqNum: e.target.value })}
+                          />
+                          <select
+                            className={inputCls}
+                            value={editing.freqUnit}
+                            onChange={(e) => setEditing({ ...editing, freqUnit: e.target.value as FreqUnit })}
+                          >
+                            <option value="days">d</option>
+                            <option value="weeks">wk</option>
+                            <option value="months">mo</option>
+                          </select>
+                        </div>
+                      </td>
+                      <td className="py-2 pr-2">
+                        <input
+                          type="date"
+                          className={inputCls}
+                          value={editing.lastDone}
+                          onChange={(e) => setEditing({ ...editing, lastDone: e.target.value })}
+                        />
+                      </td>
+                      <td className="py-2 pr-2 text-gray-400 text-xs">recalculates on save</td>
+                      <td className="py-2">
+                        <div className="flex items-center gap-2 justify-end">
+                          <button
+                            onClick={handleSaveEdit}
+                            disabled={saving === chore.id}
+                            className="text-xs px-2 py-1 border border-black hover:bg-black hover:text-white transition-colors disabled:opacity-40"
+                          >
+                            {saving === chore.id ? "Saving..." : "Save"}
+                          </button>
+                          <button onClick={() => setEditing(null)} className="text-gray-400 hover:text-black transition-colors">
+                            <X size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
+
                 return (
                   <tr key={chore.id} className="border-b border-gray-100">
                     <td className="py-2 pr-4 font-medium">{chore.name}</td>
                     <td className="py-2 pr-4 text-gray-500">{formatFrequency(chore.frequency_days)}</td>
                     <td className="py-2 pr-4 text-gray-500">{formatDate(chore.last_done_at)}</td>
                     <td className="py-2 pr-4">
-                      <NextDueCell
-                        daysUntilDue={daysUntilDue}
-                        lastDoneAt={chore.last_done_at}
-                        frequencyDays={chore.frequency_days}
-                      />
+                      <NextDueCell daysUntilDue={daysUntilDue} lastDoneAt={chore.last_done_at} frequencyDays={chore.frequency_days} />
                     </td>
                     <td className="py-2">
                       <div className="flex items-center gap-2 justify-end">
@@ -204,9 +296,17 @@ export function ChoreTracker() {
                           done
                         </button>
                         <button
+                          onClick={() => startEdit(chore)}
+                          className="text-gray-300 hover:text-black transition-colors"
+                          title="Edit"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        <button
                           onClick={() => handleDelete(chore.id)}
                           disabled={deleting === chore.id}
                           className="text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40"
+                          title="Delete"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -239,7 +339,7 @@ export function ChoreTracker() {
           />
           <select
             value={newFreqUnit}
-            onChange={(e) => setNewFreqUnit(e.target.value as "days" | "weeks" | "months")}
+            onChange={(e) => setNewFreqUnit(e.target.value as FreqUnit)}
             className="border border-gray-300 font-mono text-sm px-3 py-2 focus:outline-none focus:border-black"
           >
             <option value="days">days</option>
