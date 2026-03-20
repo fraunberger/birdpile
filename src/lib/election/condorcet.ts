@@ -30,12 +30,11 @@ export function calculatePairwiseMatrix(nominations: Nomination[], votes: Vote[]
                 const aIsRanked = rankA !== -1;
                 const bIsRanked = rankB !== -1;
 
-                if (aIsRanked && !bIsRanked) {
-                    pairwiseWins[a][b]++;
-                } else if (aIsRanked && bIsRanked && rankA < rankB) {
+                // Only count preference when both candidates are explicitly ranked.
+                // If a voter didn't include a candidate, we don't infer a preference over it.
+                if (aIsRanked && bIsRanked && rankA < rankB) {
                     pairwiseWins[a][b]++;
                 }
-                // If neither ranked or B preferred, no point for A
             }
         }
     });
