@@ -1,5 +1,6 @@
 import { store } from "@/lib/election/store";
 import { calculatePairwiseMatrix, determineCondorcetWinner } from "@/lib/election/condorcet";
+import { calculateIRV } from "@/lib/election/irv";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -32,12 +33,14 @@ export async function GET(
         }
     }
 
-    // Check Condorcet if completed
-    // Check Condorcet if completed
     let matrix = null;
     if (status === 'completed') {
         if (!winner) {
-            winner = determineCondorcetWinner(election.nominations, election.votes);
+            if (election.votingAlgorithm === 'condorcet') {
+                winner = determineCondorcetWinner(election.nominations, election.votes);
+            } else {
+                winner = calculateIRV(election.nominations, election.votes).winnerId;
+            }
         }
         if (ballotVisibility === "open") {
             matrix = calculatePairwiseMatrix(election.nominations, election.votes);
