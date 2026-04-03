@@ -5,6 +5,7 @@ export interface Nomination {
     id: string;
     nominatorName: string;
     restaurantName: string;
+    modifications?: string;
     isWriteIn?: boolean;
     createdAt: number;
     // Rich Data (Simulated for Coot)
