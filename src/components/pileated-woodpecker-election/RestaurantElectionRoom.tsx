@@ -52,6 +52,10 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
     const [writeInText, setWriteInText] = useState('');
     const [isSubmittingWriteIn, setIsSubmittingWriteIn] = useState(false);
 
+    // V-user modifications State
+    const [pendingRestaurant, setPendingRestaurant] = useState<RestaurantSelection | null>(null);
+    const [modifications, setModifications] = useState('');
+
     // Winner Animation State
     const [showWinnerAnimation, setShowWinnerAnimation] = useState(false);
     const [animationDone, setAnimationDone] = useState(false);
@@ -170,26 +174,38 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
         }
     };
 
-    const submitNomination = async (restaurantData: RestaurantSelection) => {
+    const isVUser = username.toLowerCase().startsWith('v');
+
+    const submitNomination = async (restaurantData: RestaurantSelection, mods?: string) => {
         const safeCodeword = codeword.trim().toLowerCase();
 
-        // Optimistic UI could go here but let's stick to simple
         const res = await fetch(`/api/elections/${electionId}/nominate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 nominatorName: username,
-                restaurantName: restaurantData.name, // Still use name for ID generation compat
+                restaurantName: restaurantData.name,
                 groupCodeword: safeCodeword,
                 isWriteIn: false,
-                metadata: restaurantData // Save the rich object
+                metadata: restaurantData,
+                modifications: mods || undefined
             })
         });
 
         if (res.ok) {
+            setPendingRestaurant(null);
+            setModifications('');
             fetchElection();
         } else {
             alert("Failed to nominate");
+        }
+    };
+
+    const handleRestaurantSelect = (restaurant: RestaurantSelection) => {
+        if (isVUser) {
+            setPendingRestaurant(restaurant);
+        } else {
+            submitNomination(restaurant);
         }
     };
 
@@ -321,6 +337,9 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
                 )}
                 <div className="flex-grow min-w-0 py-1">
                     <div className="font-bold text-gray-900 truncate leading-tight">{nom.restaurantName}</div>
+                    {nom.modifications && (
+                        <div className="text-xs text-gray-500 italic mt-0.5">{nom.modifications}</div>
+                    )}
                     {!minimal && (
                         <>
                             {meta.address && <div className="text-xs text-gray-500 truncate">{meta.address}</div>}
@@ -410,7 +429,26 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
                             )}
 
                             <div className="mt-4">
-                                <RestaurantSearch onSelect={submitNomination} />
+                                <RestaurantSearch onSelect={handleRestaurantSelect} />
+                                {isVUser && pendingRestaurant && (
+                                    <div className="mt-4 border border-gray-200 p-4 bg-gray-50 space-y-3">
+                                        <div className="text-xs font-bold text-gray-500 uppercase tracking-wider truncate">Selected: {pendingRestaurant.name}</div>
+                                        <div>
+                                            <label className="block text-xs font-bold uppercase text-gray-500 mb-1 tracking-wider">Modifications</label>
+                                            <textarea
+                                                value={modifications}
+                                                onChange={e => setModifications(e.target.value)}
+                                                placeholder="e.g. no onions, gluten-free..."
+                                                rows={2}
+                                                className="w-full border border-gray-300 p-2 text-sm outline-none focus:ring-1 focus:ring-black resize-none"
+                                            />
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button type="button" onClick={() => { setPendingRestaurant(null); setModifications(''); }} className="flex-1 py-2 text-xs font-bold uppercase border border-gray-300 bg-white hover:bg-gray-100 transition-colors">Cancel</button>
+                                            <button type="button" onClick={() => submitNomination(pendingRestaurant, modifications)} className="flex-1 py-2 text-xs font-bold uppercase bg-black text-white hover:bg-gray-900 transition-colors">Nominate</button>
+                                        </div>
+                                    </div>
+                                )}
                                 {username === election.adminName && (
                                     <button
                                         type="button"

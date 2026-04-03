@@ -27,6 +27,7 @@ export async function POST(
         id: Math.random().toString(36).substring(2, 9),
         nominatorName,
         restaurantName,
+        modifications: body.modifications || undefined,
         isWriteIn: body.isWriteIn,
         metadata: body.metadata,
         createdAt: Date.now()
