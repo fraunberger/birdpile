@@ -19,7 +19,7 @@ class ElectionStore {
 
     private normalizeElection(election: Election): Election {
         if (!election.ballotVisibility) {
-            election.ballotVisibility = "secret";
+            election.ballotVisibility = "open";
         }
         return election;
     }
@@ -146,16 +146,25 @@ class ElectionStore {
         election.state = 'completed';
 
         try {
-            let winner = determineCondorcetWinner(election.nominations, election.votes);
-            let method = "Condorcet";
+            let winner: string | null = null;
+            let method = "Instant Runoff";
             let tieBroken = false;
             let winnerVoteTime: number | undefined;
 
-            if (!winner) {
-                console.log("[Winner] No Condorcet winner, attempting IRV...");
+            if (election.votingAlgorithm === 'condorcet') {
+                winner = determineCondorcetWinner(election.nominations, election.votes);
+                method = "Condorcet";
+                if (!winner) {
+                    console.log("[Winner] No Condorcet winner, falling back to IRV...");
+                    const irvResult = calculateIRV(election.nominations, election.votes);
+                    winner = irvResult.winnerId;
+                    method = "Instant Runoff";
+                    tieBroken = irvResult.tieBroken;
+                    winnerVoteTime = irvResult.winnerVoteTime;
+                }
+            } else {
                 const irvResult = calculateIRV(election.nominations, election.votes);
                 winner = irvResult.winnerId;
-                method = "Instant Runoff";
                 tieBroken = irvResult.tieBroken;
                 winnerVoteTime = irvResult.winnerVoteTime;
             }

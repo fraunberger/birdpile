@@ -23,7 +23,8 @@ export function CreateElection({ onJoined }: { onJoined: (id: string) => void })
     const [date, setDate] = useState(''); // YYYY-MM-DD
     const [time, setTime] = useState('18:10'); // HH:MM
     const [codeword, setCodeword] = useState('');
-    const [ballotVisibility, setBallotVisibility] = useState<'secret' | 'open'>('secret');
+    const [ballotVisibility, setBallotVisibility] = useState<'secret' | 'open'>('open');
+    const [votingAlgorithm, setVotingAlgorithm] = useState<'irv' | 'condorcet'>('irv');
     const [loading, setLoading] = useState(false);
     const [loadingElections, setLoadingElections] = useState(true);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -62,7 +63,8 @@ export function CreateElection({ onJoined }: { onJoined: (id: string) => void })
                 adminName,
                 voteStartTime: timestamp,
                 groupCodeword: safeCodeword,
-                ballotVisibility
+                ballotVisibility,
+                votingAlgorithm
             })
         });
 
@@ -124,6 +126,37 @@ export function CreateElection({ onJoined }: { onJoined: (id: string) => void })
                             </button>
                         </div>
                     </div>
+
+                    <details className="group border border-gray-200 p-3">
+                        <summary className="cursor-pointer list-none flex items-center justify-between text-xs font-bold uppercase tracking-wider text-gray-400 hover:text-gray-600 transition-colors">
+                            <span>Advanced</span>
+                            <span className="group-open:rotate-180 transition-transform">▼</span>
+                        </summary>
+                        <div className="mt-3">
+                            <label className="block text-xs font-bold uppercase text-gray-500 mb-2 tracking-wider">Voting Algorithm</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setVotingAlgorithm('irv')}
+                                    className={`border p-3 text-xs font-bold uppercase tracking-wider transition-colors ${votingAlgorithm === 'irv' ? 'bg-black text-white border-black' : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'}`}
+                                >
+                                    Instant Runoff
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setVotingAlgorithm('condorcet')}
+                                    className={`border p-3 text-xs font-bold uppercase tracking-wider transition-colors ${votingAlgorithm === 'condorcet' ? 'bg-black text-white border-black' : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'}`}
+                                >
+                                    Condorcet
+                                </button>
+                            </div>
+                            <p className="mt-2 text-xs text-gray-400">
+                                {votingAlgorithm === 'irv'
+                                    ? 'Eliminates last-place options round by round until one has a majority.'
+                                    : 'Picks the option that beats all others head-to-head. Falls back to instant runoff if no such winner exists.'}
+                            </p>
+                        </div>
+                    </details>
 
                     <div className="pt-4 flex gap-3">
                         <button type="button" onClick={() => setIsCreating(false)} className="flex-1 py-3 font-bold bg-white border border-gray-300 hover:bg-gray-50 transition-colors text-gray-700 uppercase text-sm tracking-wide">Cancel</button>

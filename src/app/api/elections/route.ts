@@ -1,5 +1,6 @@
 import { store } from "@/lib/election/store";
 import { determineCondorcetWinner } from "@/lib/election/condorcet";
+import { calculateIRV } from "@/lib/election/irv";
 import { Election } from "@/lib/election/types";
 import { NextResponse } from "next/server";
 import { hashCodeword } from "@/lib/election/auth";
@@ -10,8 +11,9 @@ export const revalidate = 0;
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { name, voteStartTime, groupCodeword, adminName, ballotVisibility } = body;
-        const safeBallotVisibility = ballotVisibility === "open" ? "open" : "secret";
+        const { name, voteStartTime, groupCodeword, adminName, ballotVisibility, votingAlgorithm } = body;
+        const safeBallotVisibility = ballotVisibility === "secret" ? "secret" : "open";
+        const safeVotingAlgorithm = votingAlgorithm === "condorcet" ? "condorcet" : "irv";
 
         if (!name || !voteStartTime || !groupCodeword || !adminName) {
             return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -27,6 +29,7 @@ export async function POST(req: Request) {
             groupCodeword: hashedCodeword,
             adminName,
             ballotVisibility: safeBallotVisibility,
+            votingAlgorithm: safeVotingAlgorithm,
             voteStartTime,
             participants: [],
             nominations: [],
@@ -70,7 +73,11 @@ export async function GET() {
         if (status === 'completed') {
             let winnerId = e.winner;
             if (!winnerId) {
-                winnerId = determineCondorcetWinner(e.nominations, e.votes);
+                if (e.votingAlgorithm === 'condorcet') {
+                    winnerId = determineCondorcetWinner(e.nominations, e.votes);
+                } else {
+                    winnerId = calculateIRV(e.nominations, e.votes).winnerId;
+                }
             }
             if (winnerId) {
                 const nom = e.nominations.find(n => n.id === winnerId);
