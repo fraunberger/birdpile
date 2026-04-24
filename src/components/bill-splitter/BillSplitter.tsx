@@ -223,11 +223,11 @@ export function BillSplitter() {
                 </div>
             </div>
 
-            <table className="w-full border-collapse border border-black min-w-[800px]">
+            <table className="w-full border-collapse border border-black">
                 {/* 2. SHARED ITEMS SECTIONS (Appetizers) - ABOVE NAMES */}
                 <thead>
                     <tr className="bg-neutral-100">
-                        <td colSpan={people.length + 2} className="border border-black p-1 font-bold text-center uppercase tracking-widest text-neutral-500 text-[10px]">
+                        <td colSpan={people.length + 2} className="border border-black p-1 font-bold text-center uppercase tracking-widest text-neutral-500 text-xs">
                             Shared Items (Appetizers, Wine, etc.)
                         </td>
                     </tr>
@@ -235,8 +235,7 @@ export function BillSplitter() {
                 <tbody>
                     {sharedItems.map((s) => (
                         <tr key={s.id}>
-                            {/* Changed first cell to vertical stack to fit narrow column */}
-                            <td className="border border-black p-1 bg-white min-w-[96px] w-24 align-top">
+                            <td className="border border-black p-1 bg-white min-w-[80px] w-20 align-top sticky left-0 z-10">
                                 <div className="flex flex-col gap-1">
                                     <input
                                         type="text"
@@ -259,11 +258,9 @@ export function BillSplitter() {
                                 </div>
                             </td>
                             {people.map((p) => (
-                                <td key={p.id} className="border border-black p-1 text-center hover:bg-neutral-50 cursor-pointer w-20 align-middle" onClick={() => toggleSharedCheck(s.id, p.id)}>
-                                    <div className="flex justify-center items-center h-full">
-                                        <div className={`w-4 h-4 border border-black flex items-center justify-center ${s.checkedPeople[p.id] ? 'bg-black' : 'bg-white'}`}>
-                                            {/* No check icon, just black fill */}
-                                        </div>
+                                <td key={p.id} className="border border-black p-0 text-center hover:bg-neutral-50 cursor-pointer min-w-[44px] align-middle" onClick={() => toggleSharedCheck(s.id, p.id)}>
+                                    <div className="flex justify-center items-center min-h-[44px]">
+                                        <div className={`w-5 h-5 border-2 border-black flex items-center justify-center ${s.checkedPeople[p.id] ? 'bg-black' : 'bg-white'}`} />
                                     </div>
                                 </td>
                             ))}
@@ -271,7 +268,7 @@ export function BillSplitter() {
                         </tr>
                     ))}
                     <tr>
-                        <td colSpan={people.length + 2} className="p-1 border border-black text-center cursor-pointer hover:bg-neutral-100 text-neutral-500" onClick={() => setSharedItems([...sharedItems, { id: Math.random().toString(), name: "New Shared", amount: "", checkedPeople: {} }])}>
+                        <td colSpan={people.length + 2} className="p-3 border border-black text-center cursor-pointer hover:bg-neutral-100 text-neutral-500 select-none" onClick={() => setSharedItems([...sharedItems, { id: Math.random().toString(), name: "New Shared", amount: "", checkedPeople: {} }])}>
                             + ADD SHARED ROW
                         </td>
                     </tr>
@@ -280,14 +277,14 @@ export function BillSplitter() {
                 {/* 3. NAME ROW (Anchor) */}
                 <thead>
                     <tr className="border-t-4 border-b-4 border-black">
-                        <th className="border-r border-black p-2 bg-white text-black text-right w-24 min-w-[96px] group relative">
+                        <th className="border-r border-black p-2 bg-white text-black text-right w-20 min-w-[80px] group relative sticky left-0 z-10">
                             {/* Reset button hidden until hover */}
                             <div className="absolute left-2 top-0 bottom-0 flex items-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-red-500" onClick={clearNames} title="Clear All">
                                 <RotateCcw className="w-4 h-4" />
                             </div>
                         </th>
                         {people.map((p) => (
-                            <th key={p.id} className="border-r border-black p-1 min-w-[80px] bg-white">
+                            <th key={p.id} className="border-r border-black p-1 min-w-[64px] bg-white">
                                 <input
                                     type="text"
                                     value={p.name}
@@ -308,13 +305,13 @@ export function BillSplitter() {
                 {/* 4. INDIVIDUAL ITEMS SECTIONS - BELOW NAMES */}
                 <tbody>
                     <tr className="bg-neutral-100">
-                        <td colSpan={people.length + 2} className="border border-black p-1 font-bold text-center uppercase tracking-widest text-neutral-500 text-[10px]">
+                        <td colSpan={people.length + 2} className="border border-black p-1 font-bold text-center uppercase tracking-widest text-neutral-500 text-xs">
                             Individual Items
                         </td>
                     </tr>
                     {individualItemRows.map((row) => (
                         <tr key={row.id}>
-                            <td className="border border-black p-0.5 pl-2 bg-white text-[10px] w-24 min-w-[96px]">
+                            <td className="border border-black p-0.5 pl-2 bg-white text-xs w-20 min-w-[80px] sticky left-0 z-10">
                                 <input
                                     className="w-full bg-transparent focus:outline-none font-bold placeholder-neutral-300 py-1"
                                     defaultValue={row.label}
@@ -326,7 +323,7 @@ export function BillSplitter() {
                                         type="number"
                                         inputMode="decimal"
                                         placeholder="-"
-                                        className="w-full h-full p-0.5 text-center focus:bg-yellow-50 focus:outline-none font-medium placeholder-neutral-200 text-xs no-arrows"
+                                        className="w-full h-full p-0.5 text-center focus:bg-yellow-50 focus:outline-none font-medium placeholder-neutral-200 text-xs no-arrows min-h-[44px]"
                                         value={p.individualItems[row.id] || ""}
                                         onChange={(e) => handleIndivAmountChange(p.id, row.id, e.target.value)}
                                     />
@@ -336,7 +333,7 @@ export function BillSplitter() {
                         </tr>
                     ))}
                     <tr>
-                        <td colSpan={people.length + 2} className="p-1 border border-black text-center cursor-pointer hover:bg-neutral-100 text-neutral-500" onClick={() => setIndividualItemRows([...individualItemRows, { id: Math.random().toString(), label: "New Item" }])}>
+                        <td colSpan={people.length + 2} className="p-3 border border-black text-center cursor-pointer hover:bg-neutral-100 text-neutral-500 select-none" onClick={() => setIndividualItemRows([...individualItemRows, { id: Math.random().toString(), label: "New Item" }])}>
                             + ADD INDIVIDUAL ROW
                         </td>
                     </tr>
@@ -345,7 +342,7 @@ export function BillSplitter() {
                 {/* 5. FOOTER: Final Amounts */}
                 <tfoot>
                     <tr className="border-t-4 border-black">
-                        <td className="p-2 font-bold uppercase border border-black text-right pr-4 text-neutral-500 text-[10px]">Calculated Subtotal</td>
+                        <td className="p-2 font-bold uppercase border border-black text-right pr-4 text-neutral-500 text-xs bg-neutral-50 sticky left-0 z-10">Calculated Subtotal</td>
                         {personSubtotals.map((sub, i) => (
                             <td key={i} className="p-1 text-center font-mono border border-black bg-neutral-50 text-neutral-500 text-xs">
                                 {sub > 0 ? `$${sub.toFixed(2)}` : '-'}
@@ -354,7 +351,7 @@ export function BillSplitter() {
                         <td className="border border-black bg-neutral-100"></td>
                     </tr>
                     <tr className="bg-black text-white border-t-8 border-black text-sm">
-                        <td className="p-2 font-bold uppercase border-r border-white/50 text-right pr-4">Final Owed</td>
+                        <td className="p-2 font-bold uppercase border-r border-white/50 text-right pr-4 bg-black sticky left-0 z-10">Final Owed</td>
                         {roundedAmounts.map((amt, i) => (
                             <td key={i} className="p-1 text-center font-mono font-bold border-r border-white/50 text-md">
                                 ${amt.toFixed(2)}
