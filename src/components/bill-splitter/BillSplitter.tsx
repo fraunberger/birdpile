@@ -229,12 +229,12 @@ export function BillSplitter() {
                 Transposed: people are rows, items are columns.
                 People names are sticky on the left; scroll down for more people.
             */}
-            <div className="md:hidden overflow-x-auto">
-                <table className="w-full border-collapse border border-black">
+            <div className="md:hidden">
+                <table className="w-full table-fixed border-collapse border border-black">
                     <thead>
                         {/* Column headers: shared items first, then individual items, then totals */}
                         <tr className="border-b-4 border-black">
-                            <th className="sticky left-0 z-10 bg-white border border-black p-1 w-20 min-w-[72px]">
+                            <th className="sticky left-0 z-10 bg-white border border-black p-1 w-20">
                                 <button
                                     className="text-red-400 flex items-center justify-center w-full"
                                     onClick={clearNames}
@@ -245,7 +245,7 @@ export function BillSplitter() {
                             </th>
 
                             {sharedItems.map((s) => (
-                                <th key={s.id} className="border border-black p-1 min-w-[56px] bg-neutral-50 align-top font-normal">
+                                <th key={s.id} className="border border-black p-1 bg-neutral-50 align-top font-normal">
                                     <div className="flex flex-col gap-0.5">
                                         <input
                                             type="text"
@@ -270,7 +270,7 @@ export function BillSplitter() {
                             ))}
 
                             {individualItemRows.map((row) => (
-                                <th key={row.id} className="border border-black p-1 min-w-[52px] bg-white align-top font-normal">
+                                <th key={row.id} className="border border-black p-1 bg-white align-top font-normal">
                                     <input
                                         className="w-full bg-transparent focus:outline-none font-bold text-[10px] placeholder-neutral-300 text-center"
                                         defaultValue={row.label}
@@ -278,10 +278,10 @@ export function BillSplitter() {
                                 </th>
                             ))}
 
-                            <th className="border border-black p-1 min-w-[48px] bg-neutral-100 text-[10px] text-neutral-400 uppercase font-bold text-center">
+                            <th className="border border-black p-1 bg-neutral-100 text-[10px] text-neutral-400 uppercase font-bold text-center">
                                 Sub
                             </th>
-                            <th className="border border-black p-1 min-w-[52px] bg-black text-white text-[10px] uppercase font-bold text-center">
+                            <th className="border border-black p-1 bg-black text-white text-[10px] uppercase font-bold text-center">
                                 Owed
                             </th>
                         </tr>
