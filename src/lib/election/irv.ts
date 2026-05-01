@@ -13,7 +13,6 @@ export function calculateIRV(nominations: Nomination[], votes: Vote[]): IRVResul
 
     let candidates = nominations.map(n => n.id);
 
-    // Sort candidates by earliest #1 vote initially to handle "perfect" tie from start
     const getEarliestFirstVote = (candidateId: string): number => {
         const firstVotes = votes.filter(v => v.rankings[0] === candidateId);
         if (firstVotes.length === 0) return Infinity;
@@ -44,30 +43,31 @@ export function calculateIRV(nominations: Nomination[], votes: Vote[]): IRVResul
             }
         }
 
-        // Elimination
+        // Elimination — eliminate the candidate with the fewest first-choice votes.
+        // If multiple candidates are tied for last (even if ALL remaining are tied),
+        // eliminate the one whose earliest #1 vote came latest, then continue so
+        // vote transfers can keep resolving the runoff. We only fall through to a
+        // pure speed tiebreaker (below the loop) if IRV can't produce a majority.
         const minVotes = Math.min(...candidates.map(id => counts[id]));
         const losers = candidates.filter(id => counts[id] === minVotes);
 
-        if (losers.length === candidates.length) {
-            // Perfect tie among all remaining - use the requested tie-breaker
-            // "The first person who submitted one of the tied options at number 1 that one wins"
-            const tieBreaker = candidates.map(id => ({ id, time: getEarliestFirstVote(id) }))
-                .sort((a, b) => a.time - b.time);
-            return { winnerId: tieBreaker[0].id, tieBroken: true, winnerVoteTime: tieBreaker[0].time };
-        }
-
-        // If multiple losers, eliminate the one whose EARLIEST #1 vote was latest 
-        // (to encourage early voting even for second-tier choices)
-        // Standard IRV usually eliminates all bottom-tied or picks one. 
-        // We will pick the "most late" one to eliminate.
         if (losers.length > 1) {
             const loserTimes = losers.map(id => ({ id, time: getEarliestFirstVote(id) }))
-                .sort((a, b) => b.time - a.time); // Latest time first (to eliminate)
+                .sort((a, b) => b.time - a.time);
             candidates = candidates.filter(id => id !== loserTimes[0].id);
         } else {
             candidates = candidates.filter(id => id !== losers[0]);
         }
     }
 
-    return { winnerId: candidates[0] || null, tieBroken: false };
+    // Loop exited without a majority winner — survivor (if any) won via tiebreaker.
+    const winnerId = candidates[0] ?? null;
+    if (!winnerId) return { winnerId: null, tieBroken: false };
+
+    const winnerTime = getEarliestFirstVote(winnerId);
+    return {
+        winnerId,
+        tieBroken: true,
+        winnerVoteTime: Number.isFinite(winnerTime) ? winnerTime : undefined,
+    };
 }
