@@ -30,9 +30,12 @@ export function calculatePairwiseMatrix(nominations: Nomination[], votes: Vote[]
                 const aIsRanked = rankA !== -1;
                 const bIsRanked = rankB !== -1;
 
-                // Only count preference when both candidates are explicitly ranked.
-                // If a voter didn't include a candidate, we don't infer a preference over it.
-                if (aIsRanked && bIsRanked && rankA < rankB) {
+                // A voter prefers A over B when A is on their ballot and either B
+                // isn't, or B is ranked lower. Treating unranked candidates as less
+                // preferred than ranked ones matches conventional ranked-choice
+                // semantics — otherwise a candidate only one voter ranks can sweep
+                // every pairwise matchup and "win" Condorcet with one supporter.
+                if (aIsRanked && (!bIsRanked || rankA < rankB)) {
                     pairwiseWins[a][b]++;
                 }
             }

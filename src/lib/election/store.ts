@@ -146,33 +146,35 @@ class ElectionStore {
         election.state = 'completed';
 
         try {
-            let winner: string | null = null;
-            let method = "Instant Runoff";
-            let tieBroken = false;
-            let winnerVoteTime: number | undefined;
+            const irvResult = calculateIRV(election.nominations, election.votes);
+            const condorcetWinner = determineCondorcetWinner(election.nominations, election.votes);
 
-            if (election.votingAlgorithm === 'condorcet') {
-                winner = determineCondorcetWinner(election.nominations, election.votes);
-                method = "Condorcet";
-                if (!winner) {
-                    console.log("[Winner] No Condorcet winner, falling back to IRV...");
-                    const irvResult = calculateIRV(election.nominations, election.votes);
-                    winner = irvResult.winnerId;
-                    method = "Instant Runoff";
-                    tieBroken = irvResult.tieBroken;
-                    winnerVoteTime = irvResult.winnerVoteTime;
-                }
+            // A "clean" win = decided by the algorithm itself, not by speed.
+            const cleanIrv = irvResult.winnerId && !irvResult.tieBroken
+                ? { winner: irvResult.winnerId, method: "Instant Runoff" as const }
+                : null;
+            const cleanCondorcet = condorcetWinner
+                ? { winner: condorcetWinner, method: "Condorcet" as const }
+                : null;
+
+            // Cascade: try the user's chosen algorithm first, then the other,
+            // then fall back to IRV's speed-broken result.
+            const cascade = election.votingAlgorithm === 'condorcet'
+                ? [cleanCondorcet, cleanIrv]
+                : [cleanIrv, cleanCondorcet];
+            const cleanWin = cascade.find(r => r !== null) ?? null;
+
+            if (cleanWin) {
+                election.winner = cleanWin.winner;
+                election.winnerMethod = cleanWin.method;
+                election.tieBroken = false;
+                election.winnerVoteTime = undefined;
             } else {
-                const irvResult = calculateIRV(election.nominations, election.votes);
-                winner = irvResult.winnerId;
-                tieBroken = irvResult.tieBroken;
-                winnerVoteTime = irvResult.winnerVoteTime;
+                election.winner = irvResult.winnerId;
+                election.winnerMethod = "Instant Runoff";
+                election.tieBroken = irvResult.tieBroken;
+                election.winnerVoteTime = irvResult.winnerVoteTime;
             }
-
-            election.winner = winner;
-            election.winnerMethod = method as Election["winnerMethod"];
-            election.tieBroken = tieBroken;
-            election.winnerVoteTime = winnerVoteTime;
         } catch (e) {
             console.error("Failed to calculate winner logic", e);
         }
