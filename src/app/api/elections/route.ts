@@ -31,7 +31,10 @@ export async function POST(req: Request) {
             ballotVisibility: safeBallotVisibility,
             votingAlgorithm: safeVotingAlgorithm,
             voteStartTime,
-            participants: [],
+            // Seed the admin so they appear in the voter-status list. The admin
+            // auto-authenticates from localStorage and never hits /join, so
+            // without this they wouldn't render even after voting.
+            participants: [adminName],
             nominations: [],
             votes: [],
             createdAt: Date.now(),
