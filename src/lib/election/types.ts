@@ -1,6 +1,39 @@
 export type ElectionStatus = 'nomination' | 'voting' | 'completed' | 'cancelled';
 export type BallotVisibility = 'secret' | 'open';
 
+export type TiebreakReason = 'sole_loser' | 'lookahead' | 'most_last_place' | 'timing';
+
+export interface MajorityOutcome {
+    type: 'majority';
+    winnerId: string;
+    count: number;
+    total: number;
+}
+
+export interface EliminateOutcome {
+    type: 'eliminate';
+    eliminatedId: string;
+    reason: TiebreakReason;
+    tiedCandidates: string[];
+    lookaheadProjections?: Record<string, { winnerId: string | null; clean: boolean }>;
+    lastPlaceCounts?: Record<string, number>;
+    earliestFirstVoteTimes?: Record<string, number>;
+}
+
+export interface NoActiveVotesOutcome {
+    type: 'no_active_votes';
+}
+
+export type RoundOutcome = MajorityOutcome | EliminateOutcome | NoActiveVotesOutcome;
+
+export interface IRVRound {
+    roundNumber: number;
+    candidates: string[];
+    counts: Record<string, number>;
+    totalActiveVotes: number;
+    outcome: RoundOutcome;
+}
+
 export interface Nomination {
     id: string;
     nominatorName: string;
@@ -47,4 +80,5 @@ export interface Election {
     winnerMethod?: "Condorcet" | "Instant Runoff";
     tieBroken?: boolean;
     winnerVoteTime?: number;
+    irvRounds?: IRVRound[];
 }

@@ -175,6 +175,7 @@ class ElectionStore {
                 election.tieBroken = irvResult.tieBroken;
                 election.winnerVoteTime = irvResult.winnerVoteTime;
             }
+            election.irvRounds = irvResult.rounds;
         } catch (e) {
             console.error("Failed to calculate winner logic", e);
         }
@@ -194,6 +195,7 @@ class ElectionStore {
         election.winnerMethod = undefined;
         election.tieBroken = false;
         election.winnerVoteTime = undefined;
+        election.irvRounds = undefined;
 
         await adapter.saveElection(election);
         return election;

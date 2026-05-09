@@ -6,6 +6,7 @@ import { Election, Nomination } from '@/lib/election/types';
 import { Reorder } from "framer-motion";
 import { RestaurantSearch } from './RestaurantSearch';
 import { WinnerRevealAnimation } from './WinnerRevealAnimation';
+import { IRVDecisionTrace } from './IRVDecisionTrace';
 
 interface ExtendedElection extends Election {
     status: 'nomination' | 'voting' | 'completed' | 'cancelled';
@@ -767,18 +768,6 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
                                     Winner by {election.winnerMethod || "Consensus"}
                                 </p>
 
-                                {election.tieBroken && (
-                                    <div className="mt-4 p-4 border-2 border-dashed border-red-500 bg-red-50 max-w-sm mx-auto animate-in zoom-in duration-500">
-                                        <p className="text-red-600 font-extrabold uppercase text-[10px] mb-1 tracking-tighter flex items-center justify-center gap-1">
-                                            <span>⚡</span> Tie-Broken by Speed <span>⚡</span>
-                                        </p>
-                                        <p className="text-[11px] text-red-800 leading-tight">
-                                            This was a perfect tie! This candidate won because they received a #1 ranking first — just
-                                            <strong> {Math.max(0, Math.floor(((election.winnerVoteTime ?? election.voteStartTime) - election.voteStartTime) / 1000))} seconds </strong>
-                                            after voting opened.
-                                        </p>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     ) : (
@@ -786,6 +775,18 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
                             <h3 className="text-xl font-bold">No Clear Winner</h3>
                             <p className="text-gray-500 mt-2">The math says it&apos;s a tie or a cycle.</p>
                         </div>
+                    )}
+
+                    {election.irvRounds && election.irvRounds.length > 0 && (
+                        <IRVDecisionTrace
+                            rounds={election.irvRounds}
+                            nominations={election.nominations}
+                            voteStartTime={election.voteStartTime}
+                            finalWinnerId={election.winner ?? null}
+                            finalMethod={election.winnerMethod}
+                            tieBroken={!!election.tieBroken}
+                            winnerVoteTime={election.winnerVoteTime}
+                        />
                     )}
 
                     {election.ballotVisibility === 'open' && (
