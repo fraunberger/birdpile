@@ -3,8 +3,8 @@
 import { useMemo, useState } from 'react';
 import { Reorder } from 'framer-motion';
 import { resolveElectionWinner } from '@/lib/election/resolve';
-import { Nomination, Vote } from '@/lib/election/types';
-import { IRVDecisionTrace } from '@/components/pileated-woodpecker-election/IRVDecisionTrace';
+import type { Nomination, Vote } from '@/lib/election/types';
+import { DecisionTrace } from '@/components/pileated-woodpecker-election/DecisionTrace';
 
 const SEED_NOMS: Nomination[] = [
     { id: 'xian',       restaurantName: "Xi'an Gourmet House (Midtown)", nominatorName: 'seed', createdAt: 0 },
@@ -147,14 +147,10 @@ export default function RunoffPlaygroundPage() {
                     )}
                 </div>
 
-                <IRVDecisionTrace
-                    rounds={result.irvRounds}
+                <DecisionTrace
                     nominations={SEED_NOMS}
-                    voteStartTime={0}
                     finalWinnerId={result.winnerId}
                     finalMethod={result.method}
-                    tieBroken={result.tieBroken}
-                    winnerVoteTime={result.winnerVoteTime}
                     rankedPairs={result.rankedPairs}
                     borda={result.borda}
                     speed={result.speed}

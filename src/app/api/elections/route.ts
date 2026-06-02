@@ -10,9 +10,8 @@ export const revalidate = 0;
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { name, voteStartTime, groupCodeword, adminName, ballotVisibility, votingAlgorithm } = body;
+        const { name, voteStartTime, groupCodeword, adminName, ballotVisibility } = body;
         const safeBallotVisibility = ballotVisibility === "secret" ? "secret" : "open";
-        const safeVotingAlgorithm = votingAlgorithm === "condorcet" ? "condorcet" : "irv";
 
         if (!name || !voteStartTime || !groupCodeword || !adminName) {
             return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -28,7 +27,6 @@ export async function POST(req: Request) {
             groupCodeword: hashedCodeword,
             adminName,
             ballotVisibility: safeBallotVisibility,
-            votingAlgorithm: safeVotingAlgorithm,
             voteStartTime,
             // Seed the admin so they appear in the voter-status list. The admin
             // auto-authenticates from localStorage and never hits /join, so

@@ -2,11 +2,12 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Election, Nomination } from '@/lib/election/types';
+import type { Election, Nomination } from '@/lib/election/types';
 import { Reorder } from "framer-motion";
 import { RestaurantSearch } from './RestaurantSearch';
 import { WinnerRevealAnimation } from './WinnerRevealAnimation';
-import { IRVDecisionTrace } from './IRVDecisionTrace';
+import { DecisionTrace } from './DecisionTrace';
+import { CoinTossPanel } from './CoinTossPanel';
 
 interface ExtendedElection extends Election {
     status: 'nomination' | 'voting' | 'completed' | 'cancelled';
@@ -388,9 +389,13 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
     );
 
     const nameOfNom = (id: string) => election.nominations.find(n => n.id === id)?.restaurantName ?? id;
-    const tieNote = election.decidedBySpeed && election.speed
+    const tossResolved = !!election.coinToss?.winnerId;
+    // The speed default note; hidden once a coin toss has overridden it.
+    const tieNote = election.decidedBySpeed && election.speed && !tossResolved
         ? `${election.speed.tied.map(nameOfNom).join(' vs ')} — ${nameOfNom(election.speed.winnerId)} won by speed`
         : undefined;
+    const genuineTie = !!election.decidedBySpeed && (election.tiedOptions?.length ?? 0) >= 2;
+    const isVoter = election.votes?.some(v => v.voterName === username) ?? false;
 
     return (
         <div className="max-w-4xl mx-auto p-4 md:p-8 text-gray-900 font-sans">
@@ -788,18 +793,29 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
                         </div>
                     )}
 
-                    {election.irvRounds && election.irvRounds.length > 0 && (
-                        <IRVDecisionTrace
-                            rounds={election.irvRounds}
+                    {genuineTie && (
+                        <CoinTossPanel
+                            electionId={electionId}
+                            username={username}
+                            canToss={isVoter}
+                            tied={election.tiedOptions ?? []}
                             nominations={election.nominations}
-                            voteStartTime={election.voteStartTime}
+                            coinToss={election.coinToss}
+                            voterCount={election.votes?.length ?? 0}
+                            speedWinnerId={election.speed?.winnerId ?? null}
+                            onChange={fetchElection}
+                        />
+                    )}
+
+                    {election.rankedPairs && (
+                        <DecisionTrace
+                            nominations={election.nominations}
                             finalWinnerId={election.winner ?? null}
                             finalMethod={election.winnerMethod}
-                            tieBroken={!!election.tieBroken}
-                            winnerVoteTime={election.winnerVoteTime}
                             rankedPairs={election.rankedPairs}
                             borda={election.borda}
                             speed={election.speed}
+                            coinToss={election.coinToss}
                         />
                     )}
 

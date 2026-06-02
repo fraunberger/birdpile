@@ -6,6 +6,7 @@ import { calculateIRV } from './irv';
 import { rankedPairs } from './rankedPairs';
 import { determineCondorcetWinner } from './condorcet';
 import { resolveElectionWinner } from './resolve';
+import { coinTossThreshold, drawCoinToss, hasCoinTossMajority } from './coinToss';
 
 // ---- helpers ---------------------------------------------------------------
 
@@ -148,4 +149,27 @@ test('no votes yields no winner', () => {
 test('single candidate wins outright', () => {
     const r = resolveElectionWinner(noms('a'), ballots(['a'], ['a']));
     assert.equal(r.winnerId, 'a');
+});
+
+// ---- coin toss helpers (the group-initiated random tiebreak) ---------------
+
+test('coin toss needs a strict majority of voters', () => {
+    // 5 voters → need 3.
+    assert.equal(coinTossThreshold(5), 3);
+    assert.equal(hasCoinTossMajority(2, 5), false);
+    assert.equal(hasCoinTossMajority(3, 5), true);
+    // 4 voters → need 3 (exactly half is not enough).
+    assert.equal(coinTossThreshold(4), 3);
+    assert.equal(hasCoinTossMajority(2, 4), false);
+    assert.equal(hasCoinTossMajority(3, 4), true);
+    // No voters → never.
+    assert.equal(hasCoinTossMajority(0, 0), false);
+});
+
+test('coin toss draws only from the tied options', () => {
+    const tied = ['a', 'b', 'c'];
+    assert.equal(drawCoinToss(tied, () => 0), 'a'); // first
+    assert.equal(drawCoinToss(tied, () => 0.99), 'c'); // last
+    assert.equal(drawCoinToss(tied, () => 0.5), 'b'); // middle
+    assert.equal(drawCoinToss([], () => 0.5), null);
 });
