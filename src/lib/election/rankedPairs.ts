@@ -15,6 +15,11 @@ export interface RankedPairsResult {
     // (a real Condorcet winner). When false, the winner emerged from completing
     // a cycle / breaking pairwise ties — still deterministic, just not unanimous.
     isCondorcetWinner: boolean;
+    // The candidates with no locked edge pointing into them — i.e. nobody is
+    // ranked above them. Exactly one means a clean Ranked Pairs winner; more
+    // than one means a genuine tie at the very top (mutual pairwise ties) that a
+    // later method has to break. Ordered by the deterministic base order.
+    sources: string[];
     ranking: string[]; // full deterministic ordering, strongest first
     lockedPairs: LockedPair[]; // edges locked in: winner ranked above loser
     // The winner's head-to-head record, for human-readable explanation.
@@ -36,13 +41,14 @@ export function rankedPairs(nominations: Nomination[], votes: Vote[]): RankedPai
     const empty: RankedPairsResult = {
         winnerId: null,
         isCondorcetWinner: false,
+        sources: [],
         ranking: [],
         lockedPairs: [],
         winnerRecord: { beats: [], ties: [], losesTo: [] },
     };
     if (ids.length === 0 || votes.length === 0) return empty;
     if (ids.length === 1) {
-        return { ...empty, winnerId: ids[0], isCondorcetWinner: true, ranking: [ids[0]] };
+        return { ...empty, winnerId: ids[0], isCondorcetWinner: true, sources: [ids[0]], ranking: [ids[0]] };
     }
 
     const pw = calculatePairwiseMatrix(nominations, votes);
@@ -109,14 +115,19 @@ export function rankedPairs(nominations: Nomination[], votes: Vote[]): RankedPai
     const incoming = new Map<string, number>(ids.map(id => [id, 0]));
     for (const { loser } of lockedPairs) incoming.set(loser, incoming.get(loser)! + 1);
 
+    // The top tier: every candidate nobody is ranked above, in base order. One
+    // means a clean winner; several means a genuine tie for first place.
+    const sources = ids.filter(id => incoming.get(id)! === 0)
+        .sort((a, b) => baseRank.get(a)! - baseRank.get(b)!);
+
     const remaining = new Set(ids);
     const removedInto = new Map<string, number>(incoming);
     const ranking: string[] = [];
     while (remaining.size) {
-        const sources = [...remaining].filter(id => removedInto.get(id)! === 0);
-        // With pairwise ties there can be more than one source; the deterministic
-        // base order decides. A DAG always has at least one source.
-        const pick = sources.sort((a, b) => baseRank.get(a)! - baseRank.get(b)!)[0];
+        const available = [...remaining].filter(id => removedInto.get(id)! === 0);
+        // With pairwise ties there can be more than one available node; the
+        // deterministic base order decides. A DAG always has at least one.
+        const pick = available.sort((a, b) => baseRank.get(a)! - baseRank.get(b)!)[0];
         ranking.push(pick);
         remaining.delete(pick);
         for (const loser of adjacency.get(pick)!) {
@@ -140,6 +151,7 @@ export function rankedPairs(nominations: Nomination[], votes: Vote[]): RankedPai
     return {
         winnerId,
         isCondorcetWinner: !!winnerId && winnerRecord.losesTo.length === 0 && winnerRecord.ties.length === 0,
+        sources,
         ranking,
         lockedPairs,
         winnerRecord,

@@ -387,6 +387,11 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
         </div>
     );
 
+    const nameOfNom = (id: string) => election.nominations.find(n => n.id === id)?.restaurantName ?? id;
+    const tieNote = election.decidedBySpeed && election.speed
+        ? `${election.speed.tied.map(nameOfNom).join(' vs ')} — ${nameOfNom(election.speed.winnerId)} won by speed`
+        : undefined;
+
     return (
         <div className="max-w-4xl mx-auto p-4 md:p-8 text-gray-900 font-sans">
             <header className="flex flex-wrap gap-4 justify-between items-end mb-12 pb-4 border-b-2 border-gray-900">
@@ -722,6 +727,7 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
                     <WinnerRevealAnimation
                         nominations={election.nominations}
                         winnerId={election.winner}
+                        tieNote={tieNote}
                         onComplete={() => {
                             setAnimationDone(true);
                             setShowWinnerAnimation(false);
@@ -767,6 +773,11 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
                                 <p className="text-gray-500 font-mono text-sm uppercase mb-4">
                                     Winner by {election.winnerMethod || "Consensus"}
                                 </p>
+                                {tieNote && (
+                                    <p className="text-xs font-mono text-gray-400 -mt-2 mb-2">
+                                        📸 {tieNote}
+                                    </p>
+                                )}
 
                             </div>
                         </div>
@@ -787,6 +798,8 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
                             tieBroken={!!election.tieBroken}
                             winnerVoteTime={election.winnerVoteTime}
                             rankedPairs={election.rankedPairs}
+                            borda={election.borda}
+                            speed={election.speed}
                         />
                     )}
 

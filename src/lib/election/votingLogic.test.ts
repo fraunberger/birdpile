@@ -61,9 +61,11 @@ test('ranked pairs elects Krog — the never-loses consensus pick', () => {
 test('resolveElectionWinner fixes the bug: Krog wins via Ranked Pairs', () => {
     const r = resolveElectionWinner(BUG_NOMS, BUG_VOTES);
     assert.equal(r.winnerId, 'krog');
-    assert.equal(r.method, 'Ranked Pairs');
-    assert.equal(r.tieBroken, true);
-    // The IRV trace is still produced for the visualization.
+    assert.equal(r.method, 'Ranked Pairs'); // never-loses, but not a strict Condorcet winner
+    assert.equal(r.tieBroken, false); // a unique Ranked Pairs winner stands cleanly
+    assert.equal(r.rankedPairs.sources.length, 1);
+    assert.equal(r.decidedBySpeed, false);
+    // The IRV trace is still produced for the visualization only.
     assert.ok(r.irvRounds.length > 0);
 });
 
@@ -90,28 +92,49 @@ test('Condorcet cycle resolves deterministically (no crash, stable winner)', () 
 
 // ---- clean wins still behave as before ------------------------------------
 
-test('a strict Condorcet winner is reported as a clean Condorcet win', () => {
+test('a strict Condorcet winner is a clean Condorcet win', () => {
     const n = noms('a', 'b', 'c');
     // 'a' is preferred over both b and c by a majority.
     const v = ballots(['a', 'b', 'c'], ['a', 'c', 'b'], ['b', 'a', 'c']);
     assert.equal(determineCondorcetWinner(n, v), 'a');
     const r = resolveElectionWinner(n, v);
     assert.equal(r.winnerId, 'a');
+    assert.equal(r.method, 'Condorcet');
     assert.equal(r.tieBroken, false);
-    // IRV agrees here (a has a first-place majority), so the cascade labels it IRV.
-    assert.ok(r.method === 'Instant Runoff' || r.method === 'Condorcet');
 });
 
-test('a clean first-place majority wins by Instant Runoff with no tiebreak', () => {
+// ---- Borda fallback (genuine 3-way tie for first) --------------------------
+
+test('Borda breaks a Ranked Pairs tie of three co-equal front-runners', () => {
     const n = noms('a', 'b', 'c');
-    const v = ballots(['a'], ['a'], ['b'], ['c']); // a has 2 of 4... not majority
-    // Make it a true majority: 3 of 5.
-    const v2 = ballots(['a'], ['a'], ['a'], ['b'], ['c']);
-    const r = resolveElectionWinner(n, v2);
+    // Every pair ties head-to-head, so all three are Ranked Pairs sources, but
+    // their Borda totals differ: a=3, b=3, c=4.
+    const v = ballots(['a', 'b'], ['b', 'a'], ['c'], ['c']);
+    const rp = rankedPairs(n, v);
+    assert.deepEqual(rp.sources.sort(), ['a', 'b', 'c']); // genuine 3-way tie
+    const r = resolveElectionWinner(n, v);
+    assert.equal(r.method, 'Borda');
+    assert.equal(r.winnerId, 'c');
+    assert.equal(r.tieBroken, true);
+    assert.equal(r.decidedBySpeed, false);
+    assert.deepEqual(r.borda!.scores, { a: 3, b: 3, c: 4 });
+});
+
+// ---- Speed fallback (perfect tie even after Borda) -------------------------
+
+test('a perfect two-way tie is decided by speed, but reports both options', () => {
+    const n = noms('a', 'b');
+    // a and b tie pairwise (and therefore tie under Borda); a's only supporter
+    // voted first.
+    const v = ballots(['a'], ['b']); // v0 (a) at t=1000, v1 (b) at t=2000
+    const r = resolveElectionWinner(n, v);
+    assert.equal(r.method, 'Speed');
+    assert.equal(r.decidedBySpeed, true);
     assert.equal(r.winnerId, 'a');
-    assert.equal(r.method, 'Instant Runoff');
-    assert.equal(r.tieBroken, false);
-    assert.equal(calculateIRV(n, v).rounds.length > 0, true);
+    assert.deepEqual(r.tiedOptions.sort(), ['a', 'b']); // both shown in the finish
+    assert.equal(r.speed!.winnerId, 'a');
+    assert.equal(r.speed!.times.a, 1000);
+    assert.equal(r.speed!.times.b, 2000);
 });
 
 // ---- degenerate inputs -----------------------------------------------------

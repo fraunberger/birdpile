@@ -39,21 +39,25 @@ export async function GET(
     let tieBroken = !!election.tieBroken;
     let winnerVoteTime = election.winnerVoteTime;
     let rankedPairs = election.rankedPairs;
+    let tiedOptions = election.tiedOptions;
+    let decidedBySpeed = !!election.decidedBySpeed;
+    let borda = election.borda;
+    let speed = election.speed;
     if (status === 'completed') {
         if (!winner || !irvRounds) {
             // Resolve through the single source of truth so a lazily-completed
             // election can never disagree with a finalized one.
-            const resolved = resolveElectionWinner(
-                election.nominations,
-                election.votes,
-                election.votingAlgorithm,
-            );
+            const resolved = resolveElectionWinner(election.nominations, election.votes);
             winner = winner ?? resolved.winnerId;
             winnerMethod = winnerMethod ?? resolved.method;
             if (election.tieBroken === undefined) tieBroken = resolved.tieBroken;
             winnerVoteTime = winnerVoteTime ?? resolved.winnerVoteTime;
             rankedPairs = rankedPairs ?? resolved.rankedPairs;
             irvRounds = irvRounds ?? resolved.irvRounds;
+            tiedOptions = tiedOptions ?? resolved.tiedOptions;
+            if (election.decidedBySpeed === undefined) decidedBySpeed = resolved.decidedBySpeed;
+            borda = borda ?? resolved.borda;
+            speed = speed ?? resolved.speed;
         }
         if (ballotVisibility === "open") {
             matrix = calculatePairwiseMatrix(election.nominations, election.votes);
@@ -90,6 +94,10 @@ export async function GET(
         tieBroken,
         winnerVoteTime,
         rankedPairs,
+        tiedOptions,
+        decidedBySpeed,
+        borda,
+        speed,
         ballots,
         matrix,
         irvRounds,

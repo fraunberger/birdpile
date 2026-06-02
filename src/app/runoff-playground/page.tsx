@@ -131,9 +131,18 @@ export default function RunoffPlaygroundPage() {
                     </div>
                     {result.method && (
                         <div className="text-[11px] text-gray-300 mt-2 uppercase tracking-wider">
-                            {result.method === 'Ranked Pairs'
-                                ? '⚖ Completed by Ranked Pairs (consensus)'
-                                : `Decided cleanly by ${result.method}`}
+                            {result.method === 'Borda'
+                                ? '➗ Broke a top tie with Borda'
+                                : result.method === 'Speed'
+                                ? '⚡ Perfect tie — decided by speed'
+                                : result.method === 'Ranked Pairs'
+                                ? '⚖ Decided by Ranked Pairs (consensus)'
+                                : `Decided by ${result.method}`}
+                        </div>
+                    )}
+                    {result.decidedBySpeed && result.speed && (
+                        <div className="text-[11px] text-yellow-300 mt-1">
+                            📸 {result.speed.tied.map(nameOf).join(' vs ')} — {nameOf(result.speed.winnerId)} won by speed
                         </div>
                     )}
                 </div>
@@ -147,6 +156,8 @@ export default function RunoffPlaygroundPage() {
                     tieBroken={result.tieBroken}
                     winnerVoteTime={result.winnerVoteTime}
                     rankedPairs={result.rankedPairs}
+                    borda={result.borda}
+                    speed={result.speed}
                 />
             </section>
         </main>

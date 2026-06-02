@@ -1,7 +1,9 @@
 'use client';
 
-import { EliminateOutcome, IRVRound, Nomination, WinnerMethod } from '@/lib/election/types';
-import { RankedPairsResult } from '@/lib/election/rankedPairs';
+import type { EliminateOutcome, IRVRound, Nomination, WinnerMethod } from '@/lib/election/types';
+import type { RankedPairsResult } from '@/lib/election/rankedPairs';
+import type { BordaResult } from '@/lib/election/borda';
+import type { SpeedResult } from '@/lib/election/resolve';
 
 interface Props {
     rounds: IRVRound[];
@@ -12,6 +14,8 @@ interface Props {
     tieBroken: boolean;
     winnerVoteTime?: number;
     rankedPairs?: RankedPairsResult;
+    borda?: BordaResult;
+    speed?: SpeedResult;
 }
 
 export function IRVDecisionTrace({
@@ -23,6 +27,8 @@ export function IRVDecisionTrace({
     tieBroken,
     winnerVoteTime,
     rankedPairs,
+    borda,
+    speed,
 }: Props) {
     if (!rounds || rounds.length === 0) return null;
     const nameOf = (id: string) => nominations.find(n => n.id === id)?.restaurantName ?? id;
@@ -50,6 +56,8 @@ export function IRVDecisionTrace({
                     voteStartTime={voteStartTime}
                     nameOf={nameOf}
                     rankedPairs={rankedPairs}
+                    borda={borda}
+                    speed={speed}
                 />
             </div>
         </div>
@@ -225,6 +233,8 @@ function FinalCard({
     voteStartTime,
     nameOf,
     rankedPairs,
+    borda,
+    speed,
 }: {
     rounds: IRVRound[];
     finalWinnerId: string | null;
@@ -234,6 +244,8 @@ function FinalCard({
     voteStartTime: number;
     nameOf: (id: string) => string;
     rankedPairs?: RankedPairsResult;
+    borda?: BordaResult;
+    speed?: SpeedResult;
 }) {
     if (!finalWinnerId) {
         return (
@@ -267,6 +279,22 @@ function FinalCard({
             `Instant Runoff couldn't settle this cleanly: ${winnerName} sits high on most ballots but holds ` +
             `too few first-place votes, so the rounds above eliminate it early and leave an arbitrary tie. ` +
             `Final method: Ranked Pairs, a Condorcet method — ${recordText}, making it the genuine consensus pick.`;
+    } else if (finalMethod === 'Borda') {
+        const tiedNames = (borda?.pool ?? []).map(nameOf).join(', ');
+        const scoreText = borda
+            ? borda.ranking.map(id => `${nameOf(id)} ${borda.scores[id]}`).join(', ')
+            : '';
+        body =
+            `Ranked Pairs left ${tiedNames} in a dead heat for first — each ties the others head-to-head, ` +
+            `so no Condorcet winner exists. Broke it with a Borda count among just them` +
+            (scoreText ? ` (${scoreText})` : '') +
+            `: ${winnerName} scores highest.`;
+    } else if (finalMethod === 'Speed') {
+        const tiedNames = (speed?.tied ?? []).map(nameOf).join(' vs ');
+        body =
+            `Ranked Pairs and then Borda both ended in a perfect tie between ${tiedNames}. ` +
+            `As the absolute last resort, ${winnerName} wins by speed — its earliest supporting ballot ` +
+            `came in first.`;
     } else if (finalMethod === 'Condorcet') {
         if (irvAgrees) {
             body = `Final method: Condorcet — ${winnerName} beats every other candidate in head-to-head pairwise matchups. Instant Runoff would have picked the same winner.`;

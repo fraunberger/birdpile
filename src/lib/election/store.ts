@@ -145,17 +145,17 @@ class ElectionStore {
         election.state = 'completed';
 
         try {
-            const resolved = resolveElectionWinner(
-                election.nominations,
-                election.votes,
-                election.votingAlgorithm,
-            );
+            const resolved = resolveElectionWinner(election.nominations, election.votes);
             election.winner = resolved.winnerId;
             election.winnerMethod = resolved.method;
             election.tieBroken = resolved.tieBroken;
             election.winnerVoteTime = resolved.winnerVoteTime;
             election.irvRounds = resolved.irvRounds;
             election.rankedPairs = resolved.rankedPairs;
+            election.tiedOptions = resolved.tiedOptions;
+            election.decidedBySpeed = resolved.decidedBySpeed;
+            election.borda = resolved.borda;
+            election.speed = resolved.speed;
         } catch (e) {
             console.error("Failed to calculate winner logic", e);
         }
@@ -177,6 +177,10 @@ class ElectionStore {
         election.winnerVoteTime = undefined;
         election.irvRounds = undefined;
         election.rankedPairs = undefined;
+        election.tiedOptions = undefined;
+        election.decidedBySpeed = undefined;
+        election.borda = undefined;
+        election.speed = undefined;
 
         await adapter.saveElection(election);
         return election;

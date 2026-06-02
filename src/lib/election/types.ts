@@ -1,11 +1,13 @@
 import type { RankedPairsResult } from "./rankedPairs";
+import type { BordaResult } from "./borda";
+import type { SpeedResult } from "./resolve";
 
 export type ElectionStatus = 'nomination' | 'voting' | 'completed' | 'cancelled';
 export type BallotVisibility = 'secret' | 'open';
 
 export type TiebreakReason = 'sole_loser' | 'lookahead' | 'most_last_place' | 'timing';
 
-export type WinnerMethod = "Condorcet" | "Instant Runoff" | "Ranked Pairs";
+export type WinnerMethod = "Condorcet" | "Instant Runoff" | "Ranked Pairs" | "Borda" | "Speed";
 
 export interface MajorityOutcome {
     type: 'majority';
@@ -86,4 +88,9 @@ export interface Election {
     winnerVoteTime?: number;
     irvRounds?: IRVRound[];
     rankedPairs?: RankedPairsResult;
+    // Set when the winner came from a tiebreak beyond Ranked Pairs.
+    tiedOptions?: string[];
+    decidedBySpeed?: boolean;
+    borda?: BordaResult;
+    speed?: SpeedResult;
 }

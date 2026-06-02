@@ -75,7 +75,7 @@ export async function GET() {
         if (status === 'completed') {
             let winnerId = e.winner;
             if (!winnerId) {
-                winnerId = resolveElectionWinner(e.nominations, e.votes, e.votingAlgorithm).winnerId;
+                winnerId = resolveElectionWinner(e.nominations, e.votes).winnerId;
             }
             if (winnerId) {
                 const nom = e.nominations.find(n => n.id === winnerId);

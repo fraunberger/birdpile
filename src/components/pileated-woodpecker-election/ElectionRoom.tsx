@@ -538,6 +538,13 @@ export function ElectionRoom({ electionId, onExit }: { electionId: string, onExi
                                 <p className="text-gray-500 font-mono text-sm uppercase mb-4">
                                     Winner by {election.winnerMethod || "Consensus"}
                                 </p>
+                                {election.decidedBySpeed && election.speed && (
+                                    <p className="text-xs font-mono text-gray-400 -mt-2 mb-2">
+                                        📸 {election.speed.tied.map(id => election.nominations.find(n => n.id === id)?.restaurantName ?? id).join(' vs ')}
+                                        {' — '}
+                                        {election.nominations.find(n => n.id === election.speed!.winnerId)?.restaurantName ?? election.speed.winnerId} won by speed
+                                    </p>
+                                )}
 
                             </div>
                         </div>
@@ -558,6 +565,8 @@ export function ElectionRoom({ electionId, onExit }: { electionId: string, onExi
                             tieBroken={!!election.tieBroken}
                             winnerVoteTime={election.winnerVoteTime}
                             rankedPairs={election.rankedPairs}
+                            borda={election.borda}
+                            speed={election.speed}
                         />
                     )}
 
