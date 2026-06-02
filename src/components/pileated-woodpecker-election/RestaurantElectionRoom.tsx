@@ -2,11 +2,12 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Election, Nomination } from '@/lib/election/types';
+import type { Election, Nomination } from '@/lib/election/types';
 import { Reorder } from "framer-motion";
 import { RestaurantSearch } from './RestaurantSearch';
 import { WinnerRevealAnimation } from './WinnerRevealAnimation';
-import { IRVDecisionTrace } from './IRVDecisionTrace';
+import { DecisionTrace } from './DecisionTrace';
+import { CoinTossPanel } from './CoinTossPanel';
 
 interface ExtendedElection extends Election {
     status: 'nomination' | 'voting' | 'completed' | 'cancelled';
@@ -387,6 +388,15 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
         </div>
     );
 
+    const nameOfNom = (id: string) => election.nominations.find(n => n.id === id)?.restaurantName ?? id;
+    const tossResolved = !!election.coinToss?.winnerId;
+    // The speed default note; hidden once a coin toss has overridden it.
+    const tieNote = election.decidedBySpeed && election.speed && !tossResolved
+        ? `${election.speed.tied.map(nameOfNom).join(' vs ')} — ${nameOfNom(election.speed.winnerId)} won by speed`
+        : undefined;
+    const genuineTie = !!election.decidedBySpeed && (election.tiedOptions?.length ?? 0) >= 2;
+    const isVoter = election.votes?.some(v => v.voterName === username) ?? false;
+
     return (
         <div className="max-w-4xl mx-auto p-4 md:p-8 text-gray-900 font-sans">
             <header className="flex flex-wrap gap-4 justify-between items-end mb-12 pb-4 border-b-2 border-gray-900">
@@ -722,6 +732,7 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
                     <WinnerRevealAnimation
                         nominations={election.nominations}
                         winnerId={election.winner}
+                        tieNote={tieNote}
                         onComplete={() => {
                             setAnimationDone(true);
                             setShowWinnerAnimation(false);
@@ -767,6 +778,11 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
                                 <p className="text-gray-500 font-mono text-sm uppercase mb-4">
                                     Winner by {election.winnerMethod || "Consensus"}
                                 </p>
+                                {tieNote && (
+                                    <p className="text-xs font-mono text-gray-400 -mt-2 mb-2">
+                                        📸 {tieNote}
+                                    </p>
+                                )}
 
                             </div>
                         </div>
@@ -777,15 +793,29 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
                         </div>
                     )}
 
-                    {election.irvRounds && election.irvRounds.length > 0 && (
-                        <IRVDecisionTrace
-                            rounds={election.irvRounds}
+                    {genuineTie && (
+                        <CoinTossPanel
+                            electionId={electionId}
+                            username={username}
+                            canToss={isVoter}
+                            tied={election.tiedOptions ?? []}
                             nominations={election.nominations}
-                            voteStartTime={election.voteStartTime}
+                            coinToss={election.coinToss}
+                            voterCount={election.votes?.length ?? 0}
+                            speedWinnerId={election.speed?.winnerId ?? null}
+                            onChange={fetchElection}
+                        />
+                    )}
+
+                    {election.rankedPairs && (
+                        <DecisionTrace
+                            nominations={election.nominations}
                             finalWinnerId={election.winner ?? null}
                             finalMethod={election.winnerMethod}
-                            tieBroken={!!election.tieBroken}
-                            winnerVoteTime={election.winnerVoteTime}
+                            rankedPairs={election.rankedPairs}
+                            borda={election.borda}
+                            speed={election.speed}
+                            coinToss={election.coinToss}
                         />
                     )}
 

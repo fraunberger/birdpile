@@ -1,7 +1,22 @@
+import type { RankedPairsResult } from "./rankedPairs";
+import type { BordaResult } from "./borda";
+import type { SpeedResult } from "./resolve";
+
 export type ElectionStatus = 'nomination' | 'voting' | 'completed' | 'cancelled';
 export type BallotVisibility = 'secret' | 'open';
 
 export type TiebreakReason = 'sole_loser' | 'lookahead' | 'most_last_place' | 'timing';
+
+export type WinnerMethod = "Condorcet" | "Instant Runoff" | "Ranked Pairs" | "Borda" | "Speed" | "Coin Toss";
+
+export interface CoinTossState {
+    // Voter names (lowercased) who have asked for a random toss.
+    requesters: string[];
+    // Set once a majority of voters triggers the spin; the random pick is frozen
+    // here so every client lands on the same option.
+    winnerId?: string;
+    resolvedAt?: number;
+}
 
 export interface MajorityOutcome {
     type: 'majority';
@@ -75,10 +90,17 @@ export interface Election {
 
     // Computed or explicitly set
     createdAt: number;
-    votingAlgorithm?: 'condorcet' | 'irv'; // default: 'irv'
     winner?: string | null;
-    winnerMethod?: "Condorcet" | "Instant Runoff";
+    winnerMethod?: WinnerMethod;
     tieBroken?: boolean;
     winnerVoteTime?: number;
     irvRounds?: IRVRound[];
+    rankedPairs?: RankedPairsResult;
+    // Set when the winner came from a tiebreak beyond Ranked Pairs.
+    tiedOptions?: string[];
+    decidedBySpeed?: boolean;
+    borda?: BordaResult;
+    speed?: SpeedResult;
+    // A genuine final tie can be re-decided by a group-initiated random toss.
+    coinToss?: CoinTossState;
 }

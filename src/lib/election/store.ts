@@ -1,5 +1,5 @@
-import { determineCondorcetWinner } from "./condorcet";
-import { calculateIRV } from "./irv";
+import { resolveElectionWinner } from "./resolve";
+import { drawCoinToss, hasCoinTossMajority } from "./coinToss";
 import { Election, Nomination, Vote } from "./types";
 import { getAdapter, StorageAdapter } from "./storage-adapter";
 
@@ -146,40 +146,67 @@ class ElectionStore {
         election.state = 'completed';
 
         try {
-            const irvResult = calculateIRV(election.nominations, election.votes);
-            const condorcetWinner = determineCondorcetWinner(election.nominations, election.votes);
-
-            // A "clean" win = decided by the algorithm itself, not by speed.
-            const cleanIrv = irvResult.winnerId && !irvResult.tieBroken
-                ? { winner: irvResult.winnerId, method: "Instant Runoff" as const }
-                : null;
-            const cleanCondorcet = condorcetWinner
-                ? { winner: condorcetWinner, method: "Condorcet" as const }
-                : null;
-
-            // Cascade: try the user's chosen algorithm first, then the other,
-            // then fall back to IRV's speed-broken result.
-            const cascade = election.votingAlgorithm === 'condorcet'
-                ? [cleanCondorcet, cleanIrv]
-                : [cleanIrv, cleanCondorcet];
-            const cleanWin = cascade.find(r => r !== null) ?? null;
-
-            if (cleanWin) {
-                election.winner = cleanWin.winner;
-                election.winnerMethod = cleanWin.method;
-                election.tieBroken = false;
-                election.winnerVoteTime = undefined;
-            } else {
-                election.winner = irvResult.winnerId;
-                election.winnerMethod = "Instant Runoff";
-                election.tieBroken = irvResult.tieBroken;
-                election.winnerVoteTime = irvResult.winnerVoteTime;
-            }
-            election.irvRounds = irvResult.rounds;
+            const resolved = resolveElectionWinner(election.nominations, election.votes);
+            election.winner = resolved.winnerId;
+            election.winnerMethod = resolved.method;
+            election.tieBroken = resolved.tieBroken;
+            election.winnerVoteTime = resolved.winnerVoteTime;
+            election.irvRounds = resolved.irvRounds;
+            election.rankedPairs = resolved.rankedPairs;
+            election.tiedOptions = resolved.tiedOptions;
+            election.decidedBySpeed = resolved.decidedBySpeed;
+            election.borda = resolved.borda;
+            election.speed = resolved.speed;
+            // Finalizing recomputes the tie set, so any prior toss is stale.
+            election.coinToss = undefined;
         } catch (e) {
             console.error("Failed to calculate winner logic", e);
         }
 
+        await adapter.saveElection(election);
+        return election;
+    }
+
+    /**
+     * Toggle a voter's request for a random coin toss. Only valid on a completed
+     * election that ended in a genuine tie. Once a strict majority of the voters
+     * who cast a ballot have requested it, a winner is drawn at random from the
+     * tied options and frozen so every client lands on the same result.
+     */
+    async requestCoinToss(electionId: string, voterName: string) {
+        const adapter = this.getAdapter();
+        const election = await adapter.getElection(electionId);
+        if (!election) return null;
+        this.normalizeElection(election);
+
+        const tied = election.tiedOptions ?? [];
+        if (election.state !== 'completed' || !election.decidedBySpeed || tied.length < 2) {
+            return election;
+        }
+
+        const name = voterName.trim().toLowerCase();
+        const isVoter = election.votes.some(v => v.voterName.toLowerCase() === name);
+        if (!isVoter) return election;
+
+        const coinToss = election.coinToss ?? { requesters: [] };
+        // Already resolved — the draw is final.
+        if (!coinToss.winnerId) {
+            coinToss.requesters = coinToss.requesters.includes(name)
+                ? coinToss.requesters.filter(r => r !== name)
+                : [...coinToss.requesters, name];
+
+            if (hasCoinTossMajority(coinToss.requesters.length, election.votes.length)) {
+                const pick = drawCoinToss(tied);
+                if (pick) {
+                    coinToss.winnerId = pick;
+                    coinToss.resolvedAt = Date.now();
+                    election.winner = pick;
+                    election.winnerMethod = "Coin Toss";
+                }
+            }
+        }
+
+        election.coinToss = coinToss;
         await adapter.saveElection(election);
         return election;
     }
@@ -196,6 +223,12 @@ class ElectionStore {
         election.tieBroken = false;
         election.winnerVoteTime = undefined;
         election.irvRounds = undefined;
+        election.rankedPairs = undefined;
+        election.tiedOptions = undefined;
+        election.decidedBySpeed = undefined;
+        election.borda = undefined;
+        election.speed = undefined;
+        election.coinToss = undefined;
 
         await adapter.saveElection(election);
         return election;

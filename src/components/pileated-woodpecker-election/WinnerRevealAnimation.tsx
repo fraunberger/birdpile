@@ -1,15 +1,18 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Nomination } from '@/lib/election/types';
+import type { Nomination } from '@/lib/election/types';
 
 interface WinnerRevealAnimationProps {
     nominations: Nomination[];
     winnerId: string;
     onComplete: () => void;
+    // When the winner only emerged from a tiebreak, the photo-finish note,
+    // e.g. "The Local vs Krog — Krog won by speed".
+    tieNote?: string;
 }
 
-export function WinnerRevealAnimation({ nominations, winnerId, onComplete }: WinnerRevealAnimationProps) {
+export function WinnerRevealAnimation({ nominations, winnerId, onComplete, tieNote }: WinnerRevealAnimationProps) {
     const [displayIdx, setDisplayIdx] = useState(0);
     const [phase, setPhase] = useState<'spinning' | 'slowing' | 'landed'>('spinning');
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -136,6 +139,15 @@ export function WinnerRevealAnimation({ nominations, winnerId, onComplete }: Win
                     />
                 ))}
             </div>
+
+            {isLanded && tieNote && (
+                <div className="mt-6 text-center max-w-sm mx-auto">
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">
+                        📸 Photo finish
+                    </div>
+                    <div className="text-xs font-mono text-gray-600">{tieNote}</div>
+                </div>
+            )}
 
             {isLanded && (
                 <div className="mt-8 text-center animate-bounce">

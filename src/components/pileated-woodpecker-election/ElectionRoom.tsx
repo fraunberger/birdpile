@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Election } from '@/lib/election/types';
+import type { Election } from '@/lib/election/types';
 import { Reorder } from "framer-motion";
-import { IRVDecisionTrace } from './IRVDecisionTrace';
+import { DecisionTrace } from './DecisionTrace';
+import { CoinTossPanel } from './CoinTossPanel';
 
 interface ExtendedElection extends Election {
     status: 'nomination' | 'voting' | 'completed';
@@ -538,6 +539,13 @@ export function ElectionRoom({ electionId, onExit }: { electionId: string, onExi
                                 <p className="text-gray-500 font-mono text-sm uppercase mb-4">
                                     Winner by {election.winnerMethod || "Consensus"}
                                 </p>
+                                {election.decidedBySpeed && election.speed && !election.coinToss?.winnerId && (
+                                    <p className="text-xs font-mono text-gray-400 -mt-2 mb-2">
+                                        📸 {election.speed.tied.map(id => election.nominations.find(n => n.id === id)?.restaurantName ?? id).join(' vs ')}
+                                        {' — '}
+                                        {election.nominations.find(n => n.id === election.speed!.winnerId)?.restaurantName ?? election.speed.winnerId} won by speed
+                                    </p>
+                                )}
 
                             </div>
                         </div>
@@ -548,15 +556,29 @@ export function ElectionRoom({ electionId, onExit }: { electionId: string, onExi
                         </div>
                     )}
 
-                    {election.irvRounds && election.irvRounds.length > 0 && (
-                        <IRVDecisionTrace
-                            rounds={election.irvRounds}
+                    {!!election.decidedBySpeed && (election.tiedOptions?.length ?? 0) >= 2 && (
+                        <CoinTossPanel
+                            electionId={electionId}
+                            username={username}
+                            canToss={election.votes?.some(v => v.voterName === username) ?? false}
+                            tied={election.tiedOptions ?? []}
                             nominations={election.nominations}
-                            voteStartTime={election.voteStartTime}
+                            coinToss={election.coinToss}
+                            voterCount={election.votes?.length ?? 0}
+                            speedWinnerId={election.speed?.winnerId ?? null}
+                            onChange={fetchElection}
+                        />
+                    )}
+
+                    {election.rankedPairs && (
+                        <DecisionTrace
+                            nominations={election.nominations}
                             finalWinnerId={election.winner ?? null}
                             finalMethod={election.winnerMethod}
-                            tieBroken={!!election.tieBroken}
-                            winnerVoteTime={election.winnerVoteTime}
+                            rankedPairs={election.rankedPairs}
+                            borda={election.borda}
+                            speed={election.speed}
+                            coinToss={election.coinToss}
                         />
                     )}
 

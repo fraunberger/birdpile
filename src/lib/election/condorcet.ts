@@ -1,4 +1,4 @@
-import { Nomination, Vote } from "./types";
+import type { Nomination, Vote } from "./types";
 
 export function calculatePairwiseMatrix(nominations: Nomination[], votes: Vote[]) {
     const candidateIds = nominations.map(n => n.id);

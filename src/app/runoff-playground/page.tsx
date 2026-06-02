@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import { Reorder } from 'framer-motion';
-import { calculateIRV } from '@/lib/election/irv';
-import { Nomination, Vote } from '@/lib/election/types';
-import { IRVDecisionTrace } from '@/components/pileated-woodpecker-election/IRVDecisionTrace';
+import { resolveElectionWinner } from '@/lib/election/resolve';
+import type { Nomination, Vote } from '@/lib/election/types';
+import { DecisionTrace } from '@/components/pileated-woodpecker-election/DecisionTrace';
 
 const SEED_NOMS: Nomination[] = [
     { id: 'xian',       restaurantName: "Xi'an Gourmet House (Midtown)", nominatorName: 'seed', createdAt: 0 },
@@ -44,7 +44,7 @@ export default function RunoffPlaygroundPage() {
     );
 
     const result = useMemo(
-        () => calculateIRV(SEED_NOMS, votesWithTimestamps),
+        () => resolveElectionWinner(SEED_NOMS, votesWithTimestamps),
         [votesWithTimestamps],
     );
 
@@ -129,21 +129,31 @@ export default function RunoffPlaygroundPage() {
                     <div className="text-2xl font-black uppercase tracking-tight">
                         🏆 {winnerName ?? 'No winner yet'}
                     </div>
-                    {result.tieBroken && (
-                        <div className="text-[11px] text-red-300 mt-2 uppercase tracking-wider">
-                            ⚡ Decided by speed (last resort)
+                    {result.method && (
+                        <div className="text-[11px] text-gray-300 mt-2 uppercase tracking-wider">
+                            {result.method === 'Borda'
+                                ? '➗ Broke a top tie with Borda'
+                                : result.method === 'Speed'
+                                ? '⚡ Perfect tie — decided by speed'
+                                : result.method === 'Ranked Pairs'
+                                ? '⚖ Decided by Ranked Pairs (consensus)'
+                                : `Decided by ${result.method}`}
+                        </div>
+                    )}
+                    {result.decidedBySpeed && result.speed && (
+                        <div className="text-[11px] text-yellow-300 mt-1">
+                            📸 {result.speed.tied.map(nameOf).join(' vs ')} — {nameOf(result.speed.winnerId)} won by speed
                         </div>
                     )}
                 </div>
 
-                <IRVDecisionTrace
-                    rounds={result.rounds}
+                <DecisionTrace
                     nominations={SEED_NOMS}
-                    voteStartTime={0}
                     finalWinnerId={result.winnerId}
-                    finalMethod="Instant Runoff"
-                    tieBroken={result.tieBroken}
-                    winnerVoteTime={result.winnerVoteTime}
+                    finalMethod={result.method}
+                    rankedPairs={result.rankedPairs}
+                    borda={result.borda}
+                    speed={result.speed}
                 />
             </section>
         </main>
