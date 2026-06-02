@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { CreateElection } from './CreateElection';
 import { RestaurantElectionRoom } from './RestaurantElectionRoom';
 
@@ -26,6 +27,15 @@ export function RestaurantVotingApp() {
                     </header>
 
                     <CreateElection onJoined={(id: string) => setActiveElectionId(id)} />
+
+                    <div className="mt-16 text-center">
+                        <Link
+                            href="/runoff-playground"
+                            className="text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-black underline decoration-gray-300 hover:decoration-black"
+                        >
+                            🧪 Runoff Playground — test ballots & see the flow chart
+                        </Link>
+                    </div>
                 </div>
             )}
         </div>
