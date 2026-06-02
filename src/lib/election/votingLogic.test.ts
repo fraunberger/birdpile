@@ -89,6 +89,15 @@ test('Condorcet cycle resolves deterministically (no crash, stable winner)', () 
     // order breaking the all-equal margins → 'a' tops the ranking.
     assert.equal(rp.winnerId, 'a');
     assert.deepEqual(rp.ranking, ['a', 'b', 'c']);
+    // The cycle-breaking edge is surfaced, not hidden: c→a was dropped, and the
+    // winner genuinely loses that head-to-head.
+    assert.equal(rp.skippedPairs.length, 1);
+    assert.deepEqual(
+        { winner: rp.skippedPairs[0].winner, loser: rp.skippedPairs[0].loser },
+        { winner: 'c', loser: 'a' },
+    );
+    assert.deepEqual(rp.winnerRecord.losesTo, ['c']);
+    assert.deepEqual(rp.tiedPairs, []);
 });
 
 // ---- clean wins still behave as before ------------------------------------

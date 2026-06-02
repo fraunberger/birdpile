@@ -63,11 +63,21 @@ function StepLabel({ n, title }: { n: number; title: string }) {
 
 function HeadToHeadCard({ rp, nameOf }: { rp: RankedPairsResult; nameOf: (id: string) => string }) {
     const tiedForFirst = rp.sources.length > 1;
+    const skipped = rp.skippedPairs ?? [];
+    const tied = rp.tiedPairs ?? [];
+    const losesTo = rp.winnerRecord.losesTo;
+    const isCycleWinner = !tiedForFirst && !rp.isCondorcetWinner && losesTo.length > 0;
+    const noPairs = rp.lockedPairs.length === 0 && skipped.length === 0;
+
     return (
         <div className="bg-white border border-gray-200 p-4">
             <StepLabel n={1} title="Head-to-head (Condorcet)" />
 
-            {rp.lockedPairs.length > 0 ? (
+            {noPairs ? (
+                <div className="text-xs text-gray-500 mb-3">
+                    No decisive head-to-head matchups — every pair tied.
+                </div>
+            ) : (
                 <div className="space-y-1.5 mb-3">
                     {rp.lockedPairs.map(p => (
                         <div key={`${p.winner}-${p.loser}`} className="flex items-center gap-2 text-sm">
@@ -79,14 +89,33 @@ function HeadToHeadCard({ rp, nameOf }: { rp: RankedPairsResult; nameOf: (id: st
                             </span>
                         </div>
                     ))}
-                </div>
-            ) : (
-                <div className="text-xs text-gray-500 mb-3">
-                    No decisive head-to-head matchups — every pair tied.
+                    {skipped.map(p => (
+                        <div
+                            key={`skip-${p.winner}-${p.loser}`}
+                            className="flex items-center gap-2 text-sm text-amber-700"
+                            title="Dropped: locking this would close a cycle"
+                        >
+                            <span className="font-bold">{nameOf(p.winner)}</span>
+                            <span className="text-amber-400">beats</span>
+                            <span>{nameOf(p.loser)}</span>
+                            <span className="text-[10px] uppercase tracking-wider bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                                cycle — dropped
+                            </span>
+                            <span className="ml-auto font-mono text-xs text-amber-600">
+                                {p.winnerVotes}–{p.loserVotes}
+                            </span>
+                        </div>
+                    ))}
                 </div>
             )}
 
-            <div className={`border-l-2 pl-3 py-1 ${tiedForFirst ? 'border-gray-300' : 'border-green-500'}`}>
+            {tied.length > 0 && (
+                <div className="text-[11px] text-gray-400 mb-3">
+                    Ties: {tied.map(t => `${nameOf(t.a)} = ${nameOf(t.b)}`).join(' · ')}
+                </div>
+            )}
+
+            <div className={`border-l-2 pl-3 py-1 ${tiedForFirst ? 'border-gray-300' : isCycleWinner ? 'border-amber-400' : 'border-green-500'}`}>
                 {tiedForFirst ? (
                     <div className="text-sm text-gray-700">
                         <span className="font-bold">{rp.sources.map(nameOf).join(' & ')}</span> are tied for first —
@@ -96,6 +125,14 @@ function HeadToHeadCard({ rp, nameOf }: { rp: RankedPairsResult; nameOf: (id: st
                     <div className="text-sm text-green-700">
                         <span className="font-bold">{nameOf(rp.winnerId!)}</span> beats every other option
                         head-to-head — a clean Condorcet winner.
+                    </div>
+                ) : isCycleWinner ? (
+                    <div className="text-sm text-amber-800">
+                        It&apos;s a cycle — {losesTo.map(nameOf).join(', ')} actually
+                        {losesTo.length === 1 ? ' beats ' : ' beat '}
+                        <span className="font-bold">{nameOf(rp.winnerId!)}</span>. Ranked Pairs locks the strongest
+                        victories first and drops the weakest edge that would close the loop, which leaves{' '}
+                        <span className="font-bold">{nameOf(rp.winnerId!)}</span> on top.
                     </div>
                 ) : (
                     <div className="text-sm text-green-700">
