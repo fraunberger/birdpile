@@ -1,15 +1,17 @@
 'use client';
 
-import { EliminateOutcome, IRVRound, Nomination } from '@/lib/election/types';
+import { EliminateOutcome, IRVRound, Nomination, WinnerMethod } from '@/lib/election/types';
+import { RankedPairsResult } from '@/lib/election/rankedPairs';
 
 interface Props {
     rounds: IRVRound[];
     nominations: Nomination[];
     voteStartTime: number;
     finalWinnerId: string | null;
-    finalMethod?: 'Instant Runoff' | 'Condorcet';
+    finalMethod?: WinnerMethod;
     tieBroken: boolean;
     winnerVoteTime?: number;
+    rankedPairs?: RankedPairsResult;
 }
 
 export function IRVDecisionTrace({
@@ -20,6 +22,7 @@ export function IRVDecisionTrace({
     finalMethod,
     tieBroken,
     winnerVoteTime,
+    rankedPairs,
 }: Props) {
     if (!rounds || rounds.length === 0) return null;
     const nameOf = (id: string) => nominations.find(n => n.id === id)?.restaurantName ?? id;
@@ -46,6 +49,7 @@ export function IRVDecisionTrace({
                     winnerVoteTime={winnerVoteTime}
                     voteStartTime={voteStartTime}
                     nameOf={nameOf}
+                    rankedPairs={rankedPairs}
                 />
             </div>
         </div>
@@ -220,14 +224,16 @@ function FinalCard({
     winnerVoteTime,
     voteStartTime,
     nameOf,
+    rankedPairs,
 }: {
     rounds: IRVRound[];
     finalWinnerId: string | null;
-    finalMethod?: 'Instant Runoff' | 'Condorcet';
+    finalMethod?: WinnerMethod;
     tieBroken: boolean;
     winnerVoteTime?: number;
     voteStartTime: number;
     nameOf: (id: string) => string;
+    rankedPairs?: RankedPairsResult;
 }) {
     if (!finalWinnerId) {
         return (
@@ -246,7 +252,22 @@ function FinalCard({
 
     let body: string;
 
-    if (finalMethod === 'Condorcet') {
+    if (finalMethod === 'Ranked Pairs') {
+        const record = rankedPairs?.winnerRecord;
+        const beats = (record?.beats ?? []).map(nameOf);
+        const ties = (record?.ties ?? []).map(nameOf);
+        const recordText = record
+            ? rankedPairs!.isCondorcetWinner
+                ? `${winnerName} beats every other candidate head-to-head`
+                : `${winnerName} never loses a head-to-head matchup` +
+                  (beats.length ? ` — beats ${beats.join(', ')}` : '') +
+                  (ties.length ? `${beats.length ? ', and ' : ' — '}ties ${ties.join(', ')}` : '')
+            : `${winnerName} is the strongest candidate by pairwise comparison`;
+        body =
+            `Instant Runoff couldn't settle this cleanly: ${winnerName} sits high on most ballots but holds ` +
+            `too few first-place votes, so the rounds above eliminate it early and leave an arbitrary tie. ` +
+            `Final method: Ranked Pairs, a Condorcet method — ${recordText}, making it the genuine consensus pick.`;
+    } else if (finalMethod === 'Condorcet') {
         if (irvAgrees) {
             body = `Final method: Condorcet — ${winnerName} beats every other candidate in head-to-head pairwise matchups. Instant Runoff would have picked the same winner.`;
         } else if (irvMajorityWinner) {

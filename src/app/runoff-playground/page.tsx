@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Reorder } from 'framer-motion';
-import { calculateIRV } from '@/lib/election/irv';
+import { resolveElectionWinner } from '@/lib/election/resolve';
 import { Nomination, Vote } from '@/lib/election/types';
 import { IRVDecisionTrace } from '@/components/pileated-woodpecker-election/IRVDecisionTrace';
 
@@ -44,7 +44,7 @@ export default function RunoffPlaygroundPage() {
     );
 
     const result = useMemo(
-        () => calculateIRV(SEED_NOMS, votesWithTimestamps),
+        () => resolveElectionWinner(SEED_NOMS, votesWithTimestamps),
         [votesWithTimestamps],
     );
 
@@ -129,21 +129,24 @@ export default function RunoffPlaygroundPage() {
                     <div className="text-2xl font-black uppercase tracking-tight">
                         🏆 {winnerName ?? 'No winner yet'}
                     </div>
-                    {result.tieBroken && (
-                        <div className="text-[11px] text-red-300 mt-2 uppercase tracking-wider">
-                            ⚡ Decided by speed (last resort)
+                    {result.method && (
+                        <div className="text-[11px] text-gray-300 mt-2 uppercase tracking-wider">
+                            {result.method === 'Ranked Pairs'
+                                ? '⚖ Completed by Ranked Pairs (consensus)'
+                                : `Decided cleanly by ${result.method}`}
                         </div>
                     )}
                 </div>
 
                 <IRVDecisionTrace
-                    rounds={result.rounds}
+                    rounds={result.irvRounds}
                     nominations={SEED_NOMS}
                     voteStartTime={0}
                     finalWinnerId={result.winnerId}
-                    finalMethod="Instant Runoff"
+                    finalMethod={result.method}
                     tieBroken={result.tieBroken}
                     winnerVoteTime={result.winnerVoteTime}
+                    rankedPairs={result.rankedPairs}
                 />
             </section>
         </main>

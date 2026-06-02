@@ -1,6 +1,5 @@
 import { store } from "@/lib/election/store";
-import { determineCondorcetWinner } from "@/lib/election/condorcet";
-import { calculateIRV } from "@/lib/election/irv";
+import { resolveElectionWinner } from "@/lib/election/resolve";
 import { Election } from "@/lib/election/types";
 import { NextResponse } from "next/server";
 import { hashCodeword } from "@/lib/election/auth";
@@ -76,11 +75,7 @@ export async function GET() {
         if (status === 'completed') {
             let winnerId = e.winner;
             if (!winnerId) {
-                if (e.votingAlgorithm === 'condorcet') {
-                    winnerId = determineCondorcetWinner(e.nominations, e.votes);
-                } else {
-                    winnerId = calculateIRV(e.nominations, e.votes).winnerId;
-                }
+                winnerId = resolveElectionWinner(e.nominations, e.votes, e.votingAlgorithm).winnerId;
             }
             if (winnerId) {
                 const nom = e.nominations.find(n => n.id === winnerId);

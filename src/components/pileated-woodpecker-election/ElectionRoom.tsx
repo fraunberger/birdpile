@@ -557,6 +557,7 @@ export function ElectionRoom({ electionId, onExit }: { electionId: string, onExi
                             finalMethod={election.winnerMethod}
                             tieBroken={!!election.tieBroken}
                             winnerVoteTime={election.winnerVoteTime}
+                            rankedPairs={election.rankedPairs}
                         />
                     )}
 

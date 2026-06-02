@@ -1,7 +1,11 @@
+import type { RankedPairsResult } from "./rankedPairs";
+
 export type ElectionStatus = 'nomination' | 'voting' | 'completed' | 'cancelled';
 export type BallotVisibility = 'secret' | 'open';
 
 export type TiebreakReason = 'sole_loser' | 'lookahead' | 'most_last_place' | 'timing';
+
+export type WinnerMethod = "Condorcet" | "Instant Runoff" | "Ranked Pairs";
 
 export interface MajorityOutcome {
     type: 'majority';
@@ -77,8 +81,9 @@ export interface Election {
     createdAt: number;
     votingAlgorithm?: 'condorcet' | 'irv'; // default: 'irv'
     winner?: string | null;
-    winnerMethod?: "Condorcet" | "Instant Runoff";
+    winnerMethod?: WinnerMethod;
     tieBroken?: boolean;
     winnerVoteTime?: number;
     irvRounds?: IRVRound[];
+    rankedPairs?: RankedPairsResult;
 }

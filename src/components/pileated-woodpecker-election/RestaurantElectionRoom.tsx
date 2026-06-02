@@ -786,6 +786,7 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
                             finalMethod={election.winnerMethod}
                             tieBroken={!!election.tieBroken}
                             winnerVoteTime={election.winnerVoteTime}
+                            rankedPairs={election.rankedPairs}
                         />
                     )}
 

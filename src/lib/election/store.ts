@@ -1,5 +1,4 @@
-import { determineCondorcetWinner } from "./condorcet";
-import { calculateIRV } from "./irv";
+import { resolveElectionWinner } from "./resolve";
 import { Election, Nomination, Vote } from "./types";
 import { getAdapter, StorageAdapter } from "./storage-adapter";
 
@@ -146,36 +145,17 @@ class ElectionStore {
         election.state = 'completed';
 
         try {
-            const irvResult = calculateIRV(election.nominations, election.votes);
-            const condorcetWinner = determineCondorcetWinner(election.nominations, election.votes);
-
-            // A "clean" win = decided by the algorithm itself, not by speed.
-            const cleanIrv = irvResult.winnerId && !irvResult.tieBroken
-                ? { winner: irvResult.winnerId, method: "Instant Runoff" as const }
-                : null;
-            const cleanCondorcet = condorcetWinner
-                ? { winner: condorcetWinner, method: "Condorcet" as const }
-                : null;
-
-            // Cascade: try the user's chosen algorithm first, then the other,
-            // then fall back to IRV's speed-broken result.
-            const cascade = election.votingAlgorithm === 'condorcet'
-                ? [cleanCondorcet, cleanIrv]
-                : [cleanIrv, cleanCondorcet];
-            const cleanWin = cascade.find(r => r !== null) ?? null;
-
-            if (cleanWin) {
-                election.winner = cleanWin.winner;
-                election.winnerMethod = cleanWin.method;
-                election.tieBroken = false;
-                election.winnerVoteTime = undefined;
-            } else {
-                election.winner = irvResult.winnerId;
-                election.winnerMethod = "Instant Runoff";
-                election.tieBroken = irvResult.tieBroken;
-                election.winnerVoteTime = irvResult.winnerVoteTime;
-            }
-            election.irvRounds = irvResult.rounds;
+            const resolved = resolveElectionWinner(
+                election.nominations,
+                election.votes,
+                election.votingAlgorithm,
+            );
+            election.winner = resolved.winnerId;
+            election.winnerMethod = resolved.method;
+            election.tieBroken = resolved.tieBroken;
+            election.winnerVoteTime = resolved.winnerVoteTime;
+            election.irvRounds = resolved.irvRounds;
+            election.rankedPairs = resolved.rankedPairs;
         } catch (e) {
             console.error("Failed to calculate winner logic", e);
         }
@@ -196,6 +176,7 @@ class ElectionStore {
         election.tieBroken = false;
         election.winnerVoteTime = undefined;
         election.irvRounds = undefined;
+        election.rankedPairs = undefined;
 
         await adapter.saveElection(election);
         return election;

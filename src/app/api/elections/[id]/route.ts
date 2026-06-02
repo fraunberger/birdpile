@@ -1,6 +1,6 @@
 import { store } from "@/lib/election/store";
-import { calculatePairwiseMatrix, determineCondorcetWinner } from "@/lib/election/condorcet";
-import { calculateIRV } from "@/lib/election/irv";
+import { calculatePairwiseMatrix } from "@/lib/election/condorcet";
+import { resolveElectionWinner } from "@/lib/election/resolve";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -35,17 +35,25 @@ export async function GET(
 
     let matrix = null;
     let irvRounds = election.irvRounds;
+    let winnerMethod = election.winnerMethod;
+    let tieBroken = !!election.tieBroken;
+    let winnerVoteTime = election.winnerVoteTime;
+    let rankedPairs = election.rankedPairs;
     if (status === 'completed') {
         if (!winner || !irvRounds) {
-            const irvResult = calculateIRV(election.nominations, election.votes);
-            irvRounds = irvRounds ?? irvResult.rounds;
-            if (!winner) {
-                if (election.votingAlgorithm === 'condorcet') {
-                    winner = determineCondorcetWinner(election.nominations, election.votes) ?? irvResult.winnerId;
-                } else {
-                    winner = irvResult.winnerId;
-                }
-            }
+            // Resolve through the single source of truth so a lazily-completed
+            // election can never disagree with a finalized one.
+            const resolved = resolveElectionWinner(
+                election.nominations,
+                election.votes,
+                election.votingAlgorithm,
+            );
+            winner = winner ?? resolved.winnerId;
+            winnerMethod = winnerMethod ?? resolved.method;
+            if (election.tieBroken === undefined) tieBroken = resolved.tieBroken;
+            winnerVoteTime = winnerVoteTime ?? resolved.winnerVoteTime;
+            rankedPairs = rankedPairs ?? resolved.rankedPairs;
+            irvRounds = irvRounds ?? resolved.irvRounds;
         }
         if (ballotVisibility === "open") {
             matrix = calculatePairwiseMatrix(election.nominations, election.votes);
@@ -78,6 +86,10 @@ export async function GET(
         votes: safeVotes,
         status,
         winner,
+        winnerMethod,
+        tieBroken,
+        winnerVoteTime,
+        rankedPairs,
         ballots,
         matrix,
         irvRounds,

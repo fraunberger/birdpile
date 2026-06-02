@@ -1,4 +1,4 @@
-import { EliminateOutcome, IRVRound, Nomination, Vote } from "./types";
+import type { EliminateOutcome, IRVRound, Nomination, Vote } from "./types";
 
 export interface IRVResult {
     winnerId: string | null;
