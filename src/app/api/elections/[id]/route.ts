@@ -34,12 +34,17 @@ export async function GET(
     }
 
     let matrix = null;
+    let irvRounds = election.irvRounds;
     if (status === 'completed') {
-        if (!winner) {
-            if (election.votingAlgorithm === 'condorcet') {
-                winner = determineCondorcetWinner(election.nominations, election.votes);
-            } else {
-                winner = calculateIRV(election.nominations, election.votes).winnerId;
+        if (!winner || !irvRounds) {
+            const irvResult = calculateIRV(election.nominations, election.votes);
+            irvRounds = irvRounds ?? irvResult.rounds;
+            if (!winner) {
+                if (election.votingAlgorithm === 'condorcet') {
+                    winner = determineCondorcetWinner(election.nominations, election.votes) ?? irvResult.winnerId;
+                } else {
+                    winner = irvResult.winnerId;
+                }
             }
         }
         if (ballotVisibility === "open") {
@@ -75,6 +80,7 @@ export async function GET(
         winner,
         ballots,
         matrix,
+        irvRounds,
         votingEndsAt
     }, {
         headers: {
