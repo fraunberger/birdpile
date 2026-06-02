@@ -16,22 +16,83 @@ const SEED_NOMS: Nomination[] = [
 ];
 
 interface PlaygroundVote {
+    id: string;
     voterName: string;
     rankings: string[];
 }
 
-const SEED_VOTES: PlaygroundVote[] = [
-    { voterName: 'Vish',        rankings: ['krog', 'lloyds'] },
-    { voterName: 'Alexa',       rankings: ['limerick', 'lloyds', 'manuels', 'righteous', 'krog'] },
-    { voterName: 'Christian',   rankings: ['manuels', 'krog', 'limerick', 'righteous', 'xian', 'lloyds'] },
-    { voterName: 'Emily',       rankings: ['righteous', 'xian', 'krog', 'lloyds', 'limerick', 'manuels'] },
-    { voterName: 'Rob Nikolai', rankings: ['xian', 'righteous', 'manuels', 'limerick'] },
-    { voterName: 'Mike',        rankings: ['lloyds', 'krog', 'xian', 'righteous'] },
-    { voterName: 'Erin',        rankings: ['lloyds', 'xian', 'limerick', 'manuels', 'righteous', 'krog'] },
+let _seq = 0;
+const mk = (voterName: string, rankings: string[]): PlaygroundVote => ({ id: `pv${++_seq}`, voterName, rankings });
+
+interface Preset {
+    key: string;
+    label: string;
+    hint: string;
+    build: () => PlaygroundVote[];
+}
+
+// One-click scenarios. Each rebuilds with fresh ids so the cards remount cleanly.
+const PRESETS: Preset[] = [
+    {
+        key: 'seed',
+        label: 'Seed (7)',
+        hint: 'The original messy demo set.',
+        build: () => [
+            mk('Vish', ['krog', 'lloyds']),
+            mk('Alexa', ['limerick', 'lloyds', 'manuels', 'righteous', 'krog']),
+            mk('Christian', ['manuels', 'krog', 'limerick', 'righteous', 'xian', 'lloyds']),
+            mk('Emily', ['righteous', 'xian', 'krog', 'lloyds', 'limerick', 'manuels']),
+            mk('Rob Nikolai', ['xian', 'righteous', 'manuels', 'limerick']),
+            mk('Mike', ['lloyds', 'krog', 'xian', 'righteous']),
+            mk('Erin', ['lloyds', 'xian', 'limerick', 'manuels', 'righteous', 'krog']),
+        ],
+    },
+    {
+        key: 'consensus',
+        label: 'Consensus (Condorcet)',
+        hint: "Krog is everyone's #2 and nobody's #1 — wins on head-to-head, but IRV would eliminate it first.",
+        build: () => [
+            mk('Ana', ['xian', 'krog']),
+            mk('Ben', ['righteous', 'krog']),
+            mk('Cara', ['manuels', 'krog']),
+            mk('Dan', ['limerick', 'krog']),
+        ],
+    },
+    {
+        key: 'tie3',
+        label: '3-way tie → Borda',
+        hint: 'Xi’an, Righteous and Manuel’s all tie head-to-head, so a Borda runoff among them decides (Manuel’s wins 4 to 3/3).',
+        build: () => [
+            mk('Ana', ['xian', 'righteous']),
+            mk('Ben', ['righteous', 'xian']),
+            mk('Cara', ['manuels']),
+            mk('Dan', ['manuels']),
+        ],
+    },
+    {
+        key: 'cycle',
+        label: 'Cycle → Ranked Pairs',
+        hint: 'Rock-paper-scissors: Xi’an > Righteous > Manuel’s > Xi’an. Ranked Pairs drops the weakest edge.',
+        build: () => [
+            mk('Ana', ['xian', 'righteous', 'manuels']),
+            mk('Ben', ['righteous', 'manuels', 'xian']),
+            mk('Cara', ['manuels', 'xian', 'righteous']),
+        ],
+    },
+    {
+        key: 'coin',
+        label: 'Perfect tie → Speed',
+        hint: 'Two options tie on everything; the earliest supporter wins by speed (and a real election could call a coin toss).',
+        build: () => [
+            mk('Ana', ['xian']),
+            mk('Ben', ['righteous']),
+        ],
+    },
 ];
 
 export default function RunoffPlaygroundPage() {
-    const [voters, setVoters] = useState<PlaygroundVote[]>(SEED_VOTES);
+    const [voters, setVoters] = useState<PlaygroundVote[]>(() => PRESETS[0].build());
+    const [activePreset, setActivePreset] = useState<string | null>('seed');
 
     // Vote order in the array = chronological order. First voter has the earliest timestamp.
     const votesWithTimestamps = useMemo<Vote[]>(
@@ -48,29 +109,40 @@ export default function RunoffPlaygroundPage() {
         [votesWithTimestamps],
     );
 
-    const reorderRankings = (voterName: string, newRankings: string[]) => {
-        setVoters(prev => prev.map(v =>
-            v.voterName === voterName ? { ...v, rankings: newRankings } : v,
-        ));
+    // Any hand-edit clears the active-preset highlight.
+    const edit = (updater: (prev: PlaygroundVote[]) => PlaygroundVote[]) => {
+        setVoters(updater);
+        setActivePreset(null);
     };
 
-    const toggleCandidate = (voterName: string, candidateId: string) => {
-        setVoters(prev => prev.map(v => {
-            if (v.voterName !== voterName) return v;
+    const loadPreset = (p: Preset) => {
+        setVoters(p.build());
+        setActivePreset(p.key);
+    };
+
+    const reorderRankings = (id: string, newRankings: string[]) =>
+        edit(prev => prev.map(v => (v.id === id ? { ...v, rankings: newRankings } : v)));
+
+    const toggleCandidate = (id: string, candidateId: string) =>
+        edit(prev => prev.map(v => {
+            if (v.id !== id) return v;
             return v.rankings.includes(candidateId)
-                ? { ...v, rankings: v.rankings.filter(id => id !== candidateId) }
+                ? { ...v, rankings: v.rankings.filter(c => c !== candidateId) }
                 : { ...v, rankings: [...v.rankings, candidateId] };
         }));
-    };
 
-    const reset = () => setVoters(SEED_VOTES);
+    const removeVoter = (id: string) => edit(prev => prev.filter(v => v.id !== id));
+
+    const addVoter = () => edit(prev => [...prev, mk(`Voter ${prev.length + 1}`, [])]);
 
     const moveVoter = (voterIdx: number, direction: -1 | 1) => {
         const target = voterIdx + direction;
         if (target < 0 || target >= voters.length) return;
-        const next = [...voters];
-        [next[voterIdx], next[target]] = [next[target], next[voterIdx]];
-        setVoters(next);
+        edit(prev => {
+            const next = [...prev];
+            [next[voterIdx], next[target]] = [next[target], next[voterIdx]];
+            return next;
+        });
     };
 
     const nameOf = (id: string) => SEED_NOMS.find(n => n.id === id)?.restaurantName ?? id;
@@ -83,16 +155,32 @@ export default function RunoffPlaygroundPage() {
                     Runoff Playground
                 </h1>
                 <p className="text-sm text-gray-500 mt-2 leading-snug">
-                    Drag candidates up/down inside each ballot to reorder. Tap ✕ to remove,
-                    tap an unranked candidate to add it back. Use ↑/↓ on each voter card to
-                    change who voted first (affects the timing tiebreaker).
+                    Load a scenario, or build your own: add/remove voters, drag candidates to
+                    reorder a ballot, tap ✕ to drop one or tap an unranked candidate to add it.
+                    Use ↑/↓ to change who voted first (affects the speed tiebreaker).
                 </p>
-                <button
-                    onClick={reset}
-                    className="mt-3 text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-black underline decoration-gray-300 hover:decoration-black"
-                >
-                    ← Reset to seed
-                </button>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                    {PRESETS.map(p => (
+                        <button
+                            key={p.key}
+                            onClick={() => loadPreset(p)}
+                            title={p.hint}
+                            className={`text-xs font-bold uppercase tracking-wider px-3 py-2 border-2 transition-colors ${
+                                activePreset === p.key
+                                    ? 'bg-black text-white border-black'
+                                    : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
+                            }`}
+                        >
+                            {p.label}
+                        </button>
+                    ))}
+                </div>
+                {activePreset && (
+                    <p className="mt-2 text-xs text-gray-400 leading-snug">
+                        {PRESETS.find(p => p.key === activePreset)?.hint}
+                    </p>
+                )}
             </header>
 
             <section>
@@ -101,21 +189,33 @@ export default function RunoffPlaygroundPage() {
                 </h2>
                 <div className="space-y-3">
                     {voters.map((vote, voterIdx) => (
-                        <div key={vote.voterName} className="bg-white border border-gray-200 p-4">
+                        <div key={vote.id} className="bg-white border border-gray-200 p-4">
                             <BallotEditor
                                 vote={vote}
                                 voterIdx={voterIdx}
                                 isFirst={voterIdx === 0}
                                 isLast={voterIdx === voters.length - 1}
-                                onReorder={r => reorderRankings(vote.voterName, r)}
-                                onToggle={id => toggleCandidate(vote.voterName, id)}
+                                onReorder={r => reorderRankings(vote.id, r)}
+                                onToggle={id => toggleCandidate(vote.id, id)}
                                 onMoveUp={() => moveVoter(voterIdx, -1)}
                                 onMoveDown={() => moveVoter(voterIdx, 1)}
+                                onRemove={() => removeVoter(vote.id)}
                                 nameOf={nameOf}
                             />
                         </div>
                     ))}
+                    {voters.length === 0 && (
+                        <div className="text-sm text-gray-400 italic text-center py-6 border border-dashed border-gray-200">
+                            No voters. Add one or load a scenario above.
+                        </div>
+                    )}
                 </div>
+                <button
+                    onClick={addVoter}
+                    className="mt-3 text-xs font-bold uppercase tracking-wider px-3 py-2 border-2 border-dashed border-gray-300 text-gray-600 hover:border-gray-500 hover:text-black transition-colors w-full"
+                >
+                    + Add voter ({voters.length} total)
+                </button>
             </section>
 
             <section className="border-t-2 border-dashed border-gray-300 pt-8">
@@ -169,6 +269,7 @@ function BallotEditor({
     onToggle,
     onMoveUp,
     onMoveDown,
+    onRemove,
     nameOf,
 }: {
     vote: PlaygroundVote;
@@ -179,6 +280,7 @@ function BallotEditor({
     onToggle: (id: string) => void;
     onMoveUp: () => void;
     onMoveDown: () => void;
+    onRemove: () => void;
     nameOf: (id: string) => string;
 }) {
     const unranked = SEED_NOMS.filter(n => !vote.rankings.includes(n.id));
@@ -210,6 +312,13 @@ function BallotEditor({
                         aria-label="Move voter later"
                     >
                         ↓
+                    </button>
+                    <button
+                        onClick={onRemove}
+                        className="text-xs px-2 py-0.5 border border-gray-200 text-gray-400 hover:border-red-400 hover:text-red-600"
+                        aria-label="Remove voter"
+                    >
+                        ✕
                     </button>
                 </div>
             </div>
