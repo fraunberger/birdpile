@@ -9,6 +9,12 @@ export interface LockedPair {
     margin: number; // winnerVotes - loserVotes (always > 0)
 }
 
+export interface TiedPair {
+    a: string;
+    b: string;
+    votes: number; // voters preferring each (equal both ways)
+}
+
 export interface RankedPairsResult {
     winnerId: string | null;
     // True when the winner strictly beats every other candidate head-to-head
@@ -22,6 +28,11 @@ export interface RankedPairsResult {
     sources: string[];
     ranking: string[]; // full deterministic ordering, strongest first
     lockedPairs: LockedPair[]; // edges locked in: winner ranked above loser
+    // Decisive matchups dropped because locking them would close a cycle. These
+    // are the head-to-heads the winner can actually lose; they explain why a
+    // cycle resolved the way it did.
+    skippedPairs: LockedPair[];
+    tiedPairs: TiedPair[]; // matchups that ended in an exact numeric tie
     // The winner's head-to-head record, for human-readable explanation.
     winnerRecord: { beats: string[]; ties: string[]; losesTo: string[] };
 }
@@ -44,6 +55,8 @@ export function rankedPairs(nominations: Nomination[], votes: Vote[]): RankedPai
         sources: [],
         ranking: [],
         lockedPairs: [],
+        skippedPairs: [],
+        tiedPairs: [],
         winnerRecord: { beats: [], ties: [], losesTo: [] },
     };
     if (ids.length === 0 || votes.length === 0) return empty;
@@ -59,13 +72,17 @@ export function rankedPairs(nominations: Nomination[], votes: Vote[]): RankedPai
     //    pair where one candidate is preferred over the other). Pairwise ties
     //    produce no edge.
     const majorities: LockedPair[] = [];
+    const tiedPairs: TiedPair[] = [];
     for (let i = 0; i < ids.length; i++) {
         for (let j = i + 1; j < ids.length; j++) {
             const a = ids[i];
             const b = ids[j];
             const ab = pw[a][b];
             const ba = pw[b][a];
-            if (ab === ba) continue; // pairwise tie — no edge
+            if (ab === ba) {
+                tiedPairs.push({ a, b, votes: ab });
+                continue; // pairwise tie — no edge
+            }
             const [winner, loser, wv, lv] = ab > ba ? [a, b, ab, ba] : [b, a, ba, ab];
             majorities.push({ winner, loser, winnerVotes: wv, loserVotes: lv, margin: wv - lv });
         }
@@ -102,9 +119,13 @@ export function rankedPairs(nominations: Nomination[], votes: Vote[]): RankedPai
     };
 
     const lockedPairs: LockedPair[] = [];
+    const skippedPairs: LockedPair[] = [];
     for (const m of majorities) {
         // Adding winner -> loser would cycle iff loser already reaches winner.
-        if (canReach(m.loser, m.winner)) continue;
+        if (canReach(m.loser, m.winner)) {
+            skippedPairs.push(m);
+            continue;
+        }
         adjacency.get(m.winner)!.add(m.loser);
         lockedPairs.push(m);
     }
@@ -154,6 +175,8 @@ export function rankedPairs(nominations: Nomination[], votes: Vote[]): RankedPai
         sources,
         ranking,
         lockedPairs,
+        skippedPairs,
+        tiedPairs,
         winnerRecord,
     };
 }
