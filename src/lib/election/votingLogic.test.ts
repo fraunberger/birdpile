@@ -85,19 +85,29 @@ test('Condorcet cycle resolves deterministically (no crash, stable winner)', () 
     assert.equal(determineCondorcetWinner(n, v), null); // genuine cycle
     const rp = rankedPairs(n, v);
     assert.equal(rp.isCondorcetWinner, false);
-    // Strongest pairwise edge locked first, with the deterministic nomination
-    // order breaking the all-equal margins → 'a' tops the ranking.
-    assert.equal(rp.winnerId, 'a');
-    assert.deepEqual(rp.ranking, ['a', 'b', 'c']);
-    // The cycle-breaking edge is surfaced, not hidden: c→a was dropped, and the
-    // winner genuinely loses that head-to-head.
+    // A cycle has no unbeaten candidate, so the whole cycle is the Smith set and
+    // there is no weak Condorcet winner — it's a genuine tie.
+    assert.equal(rp.weakCondorcetWinnerId, null);
+    assert.deepEqual([...rp.smithSet].sort(), ['a', 'b', 'c']);
+    // The cycle-breaking edge is still surfaced for display (c→a dropped).
     assert.equal(rp.skippedPairs.length, 1);
     assert.deepEqual(
         { winner: rp.skippedPairs[0].winner, loser: rp.skippedPairs[0].loser },
         { winner: 'c', loser: 'a' },
     );
-    assert.deepEqual(rp.winnerRecord.losesTo, ['c']);
     assert.deepEqual(rp.tiedPairs, []);
+});
+
+test('a symmetric cycle is a tie, not a single Ranked Pairs winner', () => {
+    const n = noms('a', 'b', 'c');
+    const v = ballots(['a', 'b', 'c'], ['b', 'c', 'a'], ['c', 'a', 'b']); // A>B>C>A
+    const r = resolveElectionWinner(n, v);
+    // Borda ties all three at 3, so it falls through to speed — but all three are
+    // reported as tied (a real election could coin-toss among them).
+    assert.equal(r.method, 'Speed');
+    assert.equal(r.decidedBySpeed, true);
+    assert.deepEqual([...r.tiedOptions].sort(), ['a', 'b', 'c']);
+    assert.deepEqual(r.borda!.scores, { a: 3, b: 3, c: 3 });
 });
 
 // ---- clean wins still behave as before ------------------------------------

@@ -62,11 +62,12 @@ function StepLabel({ n, title }: { n: number; title: string }) {
 }
 
 function HeadToHeadCard({ rp, nameOf }: { rp: RankedPairsResult; nameOf: (id: string) => string }) {
-    const tiedForFirst = rp.sources.length > 1;
     const skipped = rp.skippedPairs ?? [];
     const tied = rp.tiedPairs ?? [];
-    const losesTo = rp.winnerRecord.losesTo;
-    const isCycleWinner = !tiedForFirst && !rp.isCondorcetWinner && losesTo.length > 0;
+    const smith = rp.smithSet ?? [];
+    // No single unbeaten candidate → a genuine tie at the top.
+    const tiedForFirst = !rp.weakCondorcetWinnerId;
+    const hasCycle = skipped.length > 0;
     const noPairs = rp.lockedPairs.length === 0 && skipped.length === 0;
 
     return (
@@ -115,30 +116,25 @@ function HeadToHeadCard({ rp, nameOf }: { rp: RankedPairsResult; nameOf: (id: st
                 </div>
             )}
 
-            <div className={`border-l-2 pl-3 py-1 ${tiedForFirst ? 'border-gray-300' : isCycleWinner ? 'border-amber-400' : 'border-green-500'}`}>
+            <div className={`border-l-2 pl-3 py-1 ${tiedForFirst ? 'border-amber-400' : 'border-green-500'}`}>
                 {tiedForFirst ? (
-                    <div className="text-sm text-gray-700">
-                        <span className="font-bold">{rp.sources.map(nameOf).join(' & ')}</span> are tied for first —
-                        each ties the others head-to-head, so there&apos;s no Condorcet winner. Goes to a runoff.
+                    <div className="text-sm text-amber-800">
+                        <span className="font-bold">{smith.map(nameOf).join(', ')}</span> are tied at the top —
+                        {hasCycle
+                            ? " they form a cycle (rock-paper-scissors), so no option beats the others."
+                            : " each ties the others, so no option beats the others."}
+                        {' '}It&apos;s a real tie; a Borda runoff (then speed, then a coin toss) decides.
                     </div>
                 ) : rp.isCondorcetWinner ? (
                     <div className="text-sm text-green-700">
                         <span className="font-bold">{nameOf(rp.winnerId!)}</span> beats every other option
                         head-to-head — a clean Condorcet winner.
                     </div>
-                ) : isCycleWinner ? (
-                    <div className="text-sm text-amber-800">
-                        It&apos;s a cycle — {losesTo.map(nameOf).join(', ')} actually
-                        {losesTo.length === 1 ? ' beats ' : ' beat '}
-                        <span className="font-bold">{nameOf(rp.winnerId!)}</span>. Ranked Pairs locks the strongest
-                        victories first and drops the weakest edge that would close the loop, which leaves{' '}
-                        <span className="font-bold">{nameOf(rp.winnerId!)}</span> on top.
-                    </div>
                 ) : (
                     <div className="text-sm text-green-700">
                         <span className="font-bold">{nameOf(rp.winnerId!)}</span> is never beaten head-to-head
                         {rp.winnerRecord.ties.length > 0 && ` (ties ${rp.winnerRecord.ties.map(nameOf).join(', ')})`}
-                        {' '}— ranked above everyone, so it wins.
+                        {' '}— so it wins.
                     </div>
                 )}
             </div>
