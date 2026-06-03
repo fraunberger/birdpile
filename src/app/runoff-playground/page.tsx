@@ -1,10 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Reorder } from 'framer-motion';
 import { resolveElectionWinner } from '@/lib/election/resolve';
+import { drawCoinToss } from '@/lib/election/coinToss';
 import type { Nomination, Vote } from '@/lib/election/types';
 import { DecisionTrace } from '@/components/pileated-woodpecker-election/DecisionTrace';
+import { WinnerRevealAnimation } from '@/components/pileated-woodpecker-election/WinnerRevealAnimation';
 
 const SEED_NOMS: Nomination[] = [
     { id: 'xian',       restaurantName: "Xi'an Gourmet House (Midtown)", nominatorName: 'seed', createdAt: 0 },
@@ -148,6 +150,16 @@ export default function RunoffPlaygroundPage() {
     const nameOf = (id: string) => SEED_NOMS.find(n => n.id === id)?.restaurantName ?? id;
     const winnerName = result.winnerId ? nameOf(result.winnerId) : null;
 
+    // A genuine tie at the top — present it as a tie and let the user coin-toss it.
+    const isTie = !!result.decidedBySpeed && result.tiedOptions.length >= 2;
+    const tiedNoms = SEED_NOMS.filter(n => result.tiedOptions.includes(n.id));
+    const tiedKey = result.tiedOptions.join(',');
+
+    const [toss, setToss] = useState<{ id: string; nonce: number } | null>(null);
+    // Reset the toss whenever the tied set changes (new scenario / edit).
+    useEffect(() => { setToss(null); }, [tiedKey]);
+    const flip = () => setToss(t => ({ id: drawCoinToss(result.tiedOptions)!, nonce: (t?.nonce ?? 0) + 1 }));
+
     return (
         <main className="max-w-4xl mx-auto p-4 sm:p-8 space-y-8 text-gray-900">
             <header>
@@ -224,28 +236,67 @@ export default function RunoffPlaygroundPage() {
                 </h2>
                 <div className="bg-black text-white p-5 mb-4">
                     <div className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">
-                        Winner
+                        {isTie ? 'Result' : 'Winner'}
                     </div>
-                    <div className="text-2xl font-black uppercase tracking-tight">
-                        🏆 {winnerName ?? 'No winner yet'}
-                    </div>
-                    {result.method && (
-                        <div className="text-[11px] text-gray-300 mt-2 uppercase tracking-wider">
-                            {result.method === 'Borda'
-                                ? '➗ Broke a top tie with Borda'
-                                : result.method === 'Speed'
-                                ? '⚡ Perfect tie — decided by speed'
-                                : result.method === 'Ranked Pairs'
-                                ? '⚖ Decided by Ranked Pairs (consensus)'
-                                : `Decided by ${result.method}`}
-                        </div>
-                    )}
-                    {result.decidedBySpeed && result.speed && (
-                        <div className="text-[11px] text-yellow-300 mt-1">
-                            📸 {result.speed.tied.map(nameOf).join(' vs ')} — {nameOf(result.speed.winnerId)} won by speed
-                        </div>
+                    {isTie ? (
+                        <>
+                            <div className="text-2xl font-black uppercase tracking-tight">
+                                🏆 {result.tiedOptions.length}-way tie
+                            </div>
+                            <div className="text-sm text-gray-200 mt-1">
+                                {result.tiedOptions.map(nameOf).join(' · ')}
+                            </div>
+                            <div className="text-[11px] text-gray-400 mt-2 uppercase tracking-wider leading-snug">
+                                No option beats the others. In a real election a majority of voters can
+                                call a coin toss — try it below.
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="text-2xl font-black uppercase tracking-tight">
+                                🏆 {winnerName ?? 'No winner yet'}
+                            </div>
+                            {result.method && (
+                                <div className="text-[11px] text-gray-300 mt-2 uppercase tracking-wider">
+                                    {result.method === 'Borda'
+                                        ? '➗ Broke a top tie with Borda'
+                                        : result.method === 'Ranked Pairs'
+                                        ? '⚖ Decided by Ranked Pairs (consensus)'
+                                        : `Decided by ${result.method}`}
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
+
+                {isTie && (
+                    <div className="mb-4">
+                        {toss ? (
+                            <>
+                                <WinnerRevealAnimation
+                                    key={`${toss.id}-${toss.nonce}`}
+                                    nominations={tiedNoms}
+                                    winnerId={toss.id}
+                                    tieNote={`Random toss between ${result.tiedOptions.map(nameOf).join(' & ')}`}
+                                    onComplete={() => {}}
+                                />
+                                <button
+                                    onClick={flip}
+                                    className="mt-2 w-full text-xs font-bold uppercase tracking-wider px-3 py-2 border-2 border-purple-300 text-purple-700 hover:bg-purple-50 transition-colors"
+                                >
+                                    🎲 Flip again
+                                </button>
+                            </>
+                        ) : (
+                            <button
+                                onClick={flip}
+                                className="w-full text-sm font-bold uppercase tracking-wider px-4 py-3 border-2 border-purple-400 text-purple-700 hover:bg-purple-50 transition-colors"
+                            >
+                                🎲 Flip a coin to break the tie
+                            </button>
+                        )}
+                    </div>
+                )}
 
                 <DecisionTrace
                     nominations={SEED_NOMS}
