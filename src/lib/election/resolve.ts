@@ -58,11 +58,13 @@ export function resolveElectionWinner(nominations: Nomination[], votes: Vote[]):
         };
     }
 
-    // 1. Ranked Pairs settled it outright.
-    if (rp.sources.length === 1) {
+    // 1. One candidate loses no head-to-head (a weak Condorcet winner — beats or
+    //    ties everyone). That's a clean win, even if it isn't strict (e.g. a
+    //    broad consensus pick that ties one rival).
+    if (rp.weakCondorcetWinnerId) {
         return {
-            winnerId: rp.winnerId,
-            method: rp.isCondorcetWinner ? "Condorcet" : "Ranked Pairs",
+            winnerId: rp.weakCondorcetWinnerId,
+            method: rp.condorcetWinnerId === rp.weakCondorcetWinnerId ? "Condorcet" : "Ranked Pairs",
             tieBroken: false,
             decidedBySpeed: false,
             tiedOptions: [],
@@ -71,15 +73,16 @@ export function resolveElectionWinner(nominations: Nomination[], votes: Vote[]):
         };
     }
 
-    // 2. Genuine tie for first place → Borda among the co-leaders only.
-    const borda = bordaCount(rp.sources, votes);
+    // 2. No unbeaten candidate → a genuine tie at the top (a cycle, or mutual
+    //    ties). The contenders are the Smith set; break it with a Borda runoff.
+    const borda = bordaCount(rp.smithSet, votes);
     if (borda.winners.length === 1) {
         return {
             winnerId: borda.winners[0],
             method: "Borda",
             tieBroken: true,
             decidedBySpeed: false,
-            tiedOptions: rp.sources,
+            tiedOptions: rp.smithSet,
             irvRounds,
             rankedPairs: rp,
             borda,

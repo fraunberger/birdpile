@@ -71,8 +71,8 @@ const PRESETS: Preset[] = [
     },
     {
         key: 'cycle',
-        label: 'Cycle → Ranked Pairs',
-        hint: 'Rock-paper-scissors: Xi’an > Righteous > Manuel’s > Xi’an. Ranked Pairs drops the weakest edge.',
+        label: 'Cycle → 3-way tie',
+        hint: 'Rock-paper-scissors: Xi’an > Righteous > Manuel’s > Xi’an. No option beats the others, so it’s a genuine tie (Borda ties too → speed, and a real election could coin-toss it).',
         build: () => [
             mk('Ana', ['xian', 'righteous', 'manuels']),
             mk('Ben', ['righteous', 'manuels', 'xian']),

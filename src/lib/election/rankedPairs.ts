@@ -26,6 +26,15 @@ export interface RankedPairsResult {
     // than one means a genuine tie at the very top (mutual pairwise ties) that a
     // later method has to break. Ordered by the deterministic base order.
     sources: string[];
+    // The Smith set: the smallest group that beats everyone outside it. When no
+    // single candidate is unbeaten, this is the set of genuine co-contenders
+    // (e.g. all three of a rock-paper-scissors cycle).
+    smithSet: string[];
+    // The unique candidate that loses no head-to-head (beats or ties everyone).
+    // Null when zero or several candidates are unbeaten — that's a real tie.
+    weakCondorcetWinnerId: string | null;
+    // The candidate that strictly beats everyone, if any.
+    condorcetWinnerId: string | null;
     ranking: string[]; // full deterministic ordering, strongest first
     lockedPairs: LockedPair[]; // edges locked in: winner ranked above loser
     // Decisive matchups dropped because locking them would close a cycle. These
@@ -53,6 +62,9 @@ export function rankedPairs(nominations: Nomination[], votes: Vote[]): RankedPai
         winnerId: null,
         isCondorcetWinner: false,
         sources: [],
+        smithSet: [],
+        weakCondorcetWinnerId: null,
+        condorcetWinnerId: null,
         ranking: [],
         lockedPairs: [],
         skippedPairs: [],
@@ -61,7 +73,16 @@ export function rankedPairs(nominations: Nomination[], votes: Vote[]): RankedPai
     };
     if (ids.length === 0 || votes.length === 0) return empty;
     if (ids.length === 1) {
-        return { ...empty, winnerId: ids[0], isCondorcetWinner: true, sources: [ids[0]], ranking: [ids[0]] };
+        return {
+            ...empty,
+            winnerId: ids[0],
+            isCondorcetWinner: true,
+            sources: [ids[0]],
+            smithSet: [ids[0]],
+            weakCondorcetWinnerId: ids[0],
+            condorcetWinnerId: ids[0],
+            ranking: [ids[0]],
+        };
     }
 
     const pw = calculatePairwiseMatrix(nominations, votes);
@@ -156,7 +177,27 @@ export function rankedPairs(nominations: Nomination[], votes: Vote[]): RankedPai
         }
     }
 
-    const winnerId = ranking[0] ?? null;
+    // Candidates that lose no head-to-head (beat or tie everyone). Exactly one
+    // such candidate is the (weak) Condorcet winner; zero or several means the
+    // top is a genuine tie a runoff must settle.
+    const neverBeaten = ids.filter(a => ids.every(b => b === a || pw[a][b] >= pw[b][a]));
+    const condorcetWinnerId = ids.find(a => ids.every(b => b === a || pw[a][b] > pw[b][a])) ?? null;
+    const weakCondorcetWinnerId = neverBeaten.length === 1 ? neverBeaten[0] : null;
+
+    // Smith set: candidates that reach every other via "beats-or-ties" paths.
+    // (Pairwise data is complete, so this is exactly the top strongly-connected
+    // component — the smallest dominant set.)
+    const reach = ids.map(a => ids.map(b => a === b || pw[a][b] >= pw[b][a]));
+    for (let k = 0; k < ids.length; k++)
+        for (let i = 0; i < ids.length; i++)
+            if (reach[i][k])
+                for (let j = 0; j < ids.length; j++)
+                    if (reach[k][j]) reach[i][j] = true;
+    const smithSet = ids.filter((_, i) => ids.every((_, j) => reach[i][j]));
+
+    // Prefer the unbeaten candidate as the headline winner so winnerRecord lines
+    // up with it; otherwise fall back to the Ranked Pairs source for display.
+    const winnerId = weakCondorcetWinnerId ?? ranking[0] ?? null;
     const winnerRecord = { beats: [] as string[], ties: [] as string[], losesTo: [] as string[] };
     if (winnerId) {
         for (const other of ids) {
@@ -171,8 +212,11 @@ export function rankedPairs(nominations: Nomination[], votes: Vote[]): RankedPai
 
     return {
         winnerId,
-        isCondorcetWinner: !!winnerId && winnerRecord.losesTo.length === 0 && winnerRecord.ties.length === 0,
+        isCondorcetWinner: !!winnerId && winnerId === condorcetWinnerId,
         sources,
+        smithSet,
+        weakCondorcetWinnerId,
+        condorcetWinnerId,
         ranking,
         lockedPairs,
         skippedPairs,
