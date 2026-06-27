@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { CoinTossState, Nomination, WinnerMethod } from '@/lib/election/types';
 import type { RankedPairsResult } from '@/lib/election/rankedPairs';
 import type { BordaResult } from '@/lib/election/borda';
@@ -14,6 +15,22 @@ interface Props {
     speed?: SpeedResult;
     coinToss?: CoinTossState;
 }
+
+const ALGORITHM_EXPLAINER = `
+Ranked Pairs is a voting method that figures out a winner by looking at every possible one-on-one matchup between the options.
+
+Here's how it works:
+
+1. Count every head-to-head matchup — for each pair of options, tally how many voters preferred A over B and how many preferred B over A.
+
+2. Rank the matchups by margin — sort them from biggest blowout to closest race.
+
+3. Lock them in, one by one — starting with the most decisive matchup, "lock in" each result unless doing so would create a contradiction (a cycle, like A beats B, B beats C, but C also beats A). Cycles get skipped.
+
+4. The winner is whoever is never beaten in any locked matchup.
+
+If there's still a tie at the top, a Borda count breaks it (each option scores points based on where voters ranked it). If that's still tied, whoever got their first supporting vote earliest wins. Dead-even? A coin toss.
+`.trim();
 
 /**
  * Shows the math that actually decided the winner: the head-to-head (Condorcet
@@ -31,11 +48,29 @@ export function DecisionTrace({
     if (!rankedPairs || !rankedPairs.winnerId) return null;
     const nameOf = (id: string) => nominations.find(n => n.id === id)?.restaurantName ?? id;
 
+    const [explainerOpen, setExplainerOpen] = useState(false);
+
     return (
         <div className="max-w-2xl mx-auto mt-12 text-left">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">
-                How was this decided?
-            </h3>
+            <div className="flex items-center gap-3 mb-4">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500">
+                    How was this decided?
+                </h3>
+                <button
+                    onClick={() => setExplainerOpen(v => !v)}
+                    className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 hover:border-gray-400 px-2 py-0.5 rounded transition-colors"
+                >
+                    {explainerOpen ? 'hide explainer' : 'how does this work?'}
+                </button>
+            </div>
+            {explainerOpen && (
+                <div className="mb-4 bg-gray-50 border border-gray-200 p-4 text-sm text-gray-700 leading-relaxed">
+                    <div className="font-semibold text-gray-800 mb-2">The Ranked Pairs algorithm</div>
+                    {ALGORITHM_EXPLAINER.split('\n\n').map((para, i) => (
+                        <p key={i} className={i > 0 ? 'mt-2' : ''}>{para}</p>
+                    ))}
+                </div>
+            )}
             <div className="space-y-3">
                 <HeadToHeadCard rp={rankedPairs} nameOf={nameOf} />
                 {borda && <BordaCard borda={borda} nameOf={nameOf} />}
@@ -61,6 +96,8 @@ function StepLabel({ n, title }: { n: number; title: string }) {
     );
 }
 
+const PAIRS_PREVIEW = 3;
+
 function HeadToHeadCard({ rp, nameOf }: { rp: RankedPairsResult; nameOf: (id: string) => string }) {
     const skipped = rp.skippedPairs ?? [];
     const tied = rp.tiedPairs ?? [];
@@ -69,6 +106,14 @@ function HeadToHeadCard({ rp, nameOf }: { rp: RankedPairsResult; nameOf: (id: st
     const tiedForFirst = !rp.weakCondorcetWinnerId;
     const hasCycle = skipped.length > 0;
     const noPairs = rp.lockedPairs.length === 0 && skipped.length === 0;
+
+    const allPairs = [
+        ...rp.lockedPairs.map(p => ({ ...p, skipped: false })),
+        ...skipped.map(p => ({ ...p, skipped: true })),
+    ];
+    const hasMore = allPairs.length > PAIRS_PREVIEW;
+    const [expanded, setExpanded] = useState(false);
+    const visiblePairs = expanded || !hasMore ? allPairs : allPairs.slice(0, PAIRS_PREVIEW);
 
     return (
         <div className="bg-white border border-gray-200 p-4">
@@ -79,34 +124,45 @@ function HeadToHeadCard({ rp, nameOf }: { rp: RankedPairsResult; nameOf: (id: st
                     No decisive head-to-head matchups — every pair tied.
                 </div>
             ) : (
-                <div className="space-y-1.5 mb-3">
-                    {rp.lockedPairs.map(p => (
-                        <div key={`${p.winner}-${p.loser}`} className="flex items-center gap-2 text-sm">
-                            <span className="font-bold">{nameOf(p.winner)}</span>
-                            <span className="text-gray-400">beats</span>
-                            <span>{nameOf(p.loser)}</span>
-                            <span className="ml-auto font-mono text-xs text-gray-500">
-                                {p.winnerVotes}–{p.loserVotes}
-                            </span>
-                        </div>
-                    ))}
-                    {skipped.map(p => (
-                        <div
-                            key={`skip-${p.winner}-${p.loser}`}
-                            className="flex items-center gap-2 text-sm text-amber-700"
-                            title="Dropped: locking this would close a cycle"
+                <div className="mb-3">
+                    <div className="space-y-1.5">
+                        {visiblePairs.map(p => p.skipped ? (
+                            <div
+                                key={`skip-${p.winner}-${p.loser}`}
+                                className="flex items-center gap-2 text-sm text-amber-700"
+                                title="Dropped: locking this would close a cycle"
+                            >
+                                <span className="font-bold">{nameOf(p.winner)}</span>
+                                <span className="text-amber-400">beats</span>
+                                <span>{nameOf(p.loser)}</span>
+                                <span className="text-[10px] uppercase tracking-wider bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                                    cycle — dropped
+                                </span>
+                                <span className="ml-auto font-mono text-xs text-amber-600">
+                                    {p.winnerVotes}–{p.loserVotes}
+                                </span>
+                            </div>
+                        ) : (
+                            <div key={`${p.winner}-${p.loser}`} className="flex items-center gap-2 text-sm">
+                                <span className="font-bold">{nameOf(p.winner)}</span>
+                                <span className="text-gray-400">beats</span>
+                                <span>{nameOf(p.loser)}</span>
+                                <span className="ml-auto font-mono text-xs text-gray-500">
+                                    {p.winnerVotes}–{p.loserVotes}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                    {hasMore && (
+                        <button
+                            onClick={() => setExpanded(v => !v)}
+                            className="mt-2 text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2"
                         >
-                            <span className="font-bold">{nameOf(p.winner)}</span>
-                            <span className="text-amber-400">beats</span>
-                            <span>{nameOf(p.loser)}</span>
-                            <span className="text-[10px] uppercase tracking-wider bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
-                                cycle — dropped
-                            </span>
-                            <span className="ml-auto font-mono text-xs text-amber-600">
-                                {p.winnerVotes}–{p.loserVotes}
-                            </span>
-                        </div>
-                    ))}
+                            {expanded
+                                ? 'show less'
+                                : `+ ${allPairs.length - PAIRS_PREVIEW} more matchup${allPairs.length - PAIRS_PREVIEW === 1 ? '' : 's'}`}
+                        </button>
+                    )}
                 </div>
             )}
 
