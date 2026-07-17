@@ -326,6 +326,11 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
         return parts.join(' ');
     };
 
+    const mapsUrl = (nom: Nomination) => {
+        const query = [nom.restaurantName, nom.metadata?.address].filter(Boolean).join(', ');
+        return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    };
+
     const renderCandidateCard = (nom: Nomination, minimal = false) => {
         const meta = nom.metadata || {};
         const hasPhoto = !!meta.photo && meta.photo !== "📍"; // Ensure we don't show the old pin if it somehow got saved
@@ -338,7 +343,21 @@ export function RestaurantElectionRoom({ electionId, onExit }: { electionId: str
                     </div>
                 )}
                 <div className="flex-grow min-w-0 py-1">
-                    <div className="font-bold text-gray-900 truncate leading-tight">{nom.restaurantName}</div>
+                    <div className="flex items-center gap-2 min-w-0">
+                        <div className="font-bold text-gray-900 truncate leading-tight">{nom.restaurantName}</div>
+                        {!nom.isWriteIn && (
+                            <a
+                                href={mapsUrl(nom)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={e => e.stopPropagation()}
+                                title="View on Google Maps"
+                                className="flex-none text-xs text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
+                            >
+                                📍 Map
+                            </a>
+                        )}
+                    </div>
                     {nom.modifications && (
                         <div className="text-xs text-gray-500 italic mt-0.5">{nom.modifications}</div>
                     )}
