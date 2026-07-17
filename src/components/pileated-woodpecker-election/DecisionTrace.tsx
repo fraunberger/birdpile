@@ -96,24 +96,53 @@ function StepLabel({ n, title }: { n: number; title: string }) {
     );
 }
 
-const PAIRS_PREVIEW = 3;
+interface Matchup {
+    opponent: string;
+    result: 'beats' | 'loses' | 'ties';
+    votesFor: number;
+    votesAgainst: number;
+    // Decisive, but skipped when locking it would have closed a cycle — so it
+    // played no part in the final ranking.
+    skipped: boolean;
+}
+
+// Every nomination's full head-to-head record, built from the three
+// pair-lists Ranked Pairs already produces (each pair appears in exactly one
+// of them). Keyed by nomination id, in no particular order.
+function buildMatchups(rp: RankedPairsResult): Record<string, Matchup[]> {
+    const byId: Record<string, Matchup[]> = {};
+    const add = (id: string, m: Matchup) => (byId[id] ??= []).push(m);
+
+    for (const p of [...rp.lockedPairs, ...(rp.skippedPairs ?? [])]) {
+        const skipped = (rp.skippedPairs ?? []).includes(p);
+        add(p.winner, { opponent: p.loser, result: 'beats', votesFor: p.winnerVotes, votesAgainst: p.loserVotes, skipped });
+        add(p.loser, { opponent: p.winner, result: 'loses', votesFor: p.loserVotes, votesAgainst: p.winnerVotes, skipped });
+    }
+    for (const t of rp.tiedPairs ?? []) {
+        add(t.a, { opponent: t.b, result: 'ties', votesFor: t.votes, votesAgainst: t.votes, skipped: false });
+        add(t.b, { opponent: t.a, result: 'ties', votesFor: t.votes, votesAgainst: t.votes, skipped: false });
+    }
+    return byId;
+}
+
+function recordFor(matchups: Matchup[]): string {
+    const wins = matchups.filter(m => m.result === 'beats').length;
+    const losses = matchups.filter(m => m.result === 'loses').length;
+    const ties = matchups.filter(m => m.result === 'ties').length;
+    return ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
+}
 
 function HeadToHeadCard({ rp, nameOf }: { rp: RankedPairsResult; nameOf: (id: string) => string }) {
-    const skipped = rp.skippedPairs ?? [];
     const tied = rp.tiedPairs ?? [];
     const smith = rp.smithSet ?? [];
     // No single unbeaten candidate → a genuine tie at the top.
     const tiedForFirst = !rp.weakCondorcetWinnerId;
-    const hasCycle = skipped.length > 0;
-    const noPairs = rp.lockedPairs.length === 0 && skipped.length === 0;
+    const hasCycle = (rp.skippedPairs ?? []).length > 0;
+    const noPairs = rp.lockedPairs.length === 0 && (rp.skippedPairs ?? []).length === 0 && tied.length === 0;
 
-    const allPairs = [
-        ...rp.lockedPairs.map(p => ({ ...p, skipped: false })),
-        ...skipped.map(p => ({ ...p, skipped: true })),
-    ];
-    const hasMore = allPairs.length > PAIRS_PREVIEW;
-    const [expanded, setExpanded] = useState(false);
-    const visiblePairs = expanded || !hasMore ? allPairs : allPairs.slice(0, PAIRS_PREVIEW);
+    const matchupsById = buildMatchups(rp);
+    const order = rp.ranking.length ? rp.ranking : Object.keys(matchupsById);
+    const rankIndex = new Map(order.map((id, i) => [id, i]));
 
     return (
         <div className="bg-white border border-gray-200 p-4">
@@ -124,51 +153,19 @@ function HeadToHeadCard({ rp, nameOf }: { rp: RankedPairsResult; nameOf: (id: st
                     No decisive head-to-head matchups — every pair tied.
                 </div>
             ) : (
-                <div className="mb-3">
-                    <div className="space-y-1.5">
-                        {visiblePairs.map(p => p.skipped ? (
-                            <div
-                                key={`skip-${p.winner}-${p.loser}`}
-                                className="flex items-center gap-2 text-sm text-amber-700"
-                                title="Dropped: locking this would close a cycle"
-                            >
-                                <span className="font-bold">{nameOf(p.winner)}</span>
-                                <span className="text-amber-400">beats</span>
-                                <span>{nameOf(p.loser)}</span>
-                                <span className="text-[10px] uppercase tracking-wider bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
-                                    cycle — dropped
-                                </span>
-                                <span className="ml-auto font-mono text-xs text-amber-600">
-                                    {p.winnerVotes}–{p.loserVotes}
-                                </span>
-                            </div>
-                        ) : (
-                            <div key={`${p.winner}-${p.loser}`} className="flex items-center gap-2 text-sm">
-                                <span className="font-bold">{nameOf(p.winner)}</span>
-                                <span className="text-gray-400">beats</span>
-                                <span>{nameOf(p.loser)}</span>
-                                <span className="ml-auto font-mono text-xs text-gray-500">
-                                    {p.winnerVotes}–{p.loserVotes}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                    {hasMore && (
-                        <button
-                            onClick={() => setExpanded(v => !v)}
-                            className="mt-2 text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2"
-                        >
-                            {expanded
-                                ? 'show less'
-                                : `+ ${allPairs.length - PAIRS_PREVIEW} more matchup${allPairs.length - PAIRS_PREVIEW === 1 ? '' : 's'}`}
-                        </button>
-                    )}
-                </div>
-            )}
-
-            {tied.length > 0 && (
-                <div className="text-[11px] text-gray-400 mb-3">
-                    Ties: {tied.map(t => `${nameOf(t.a)} = ${nameOf(t.b)}`).join(' · ')}
+                <div className="divide-y divide-gray-100 mb-3">
+                    {order.map(id => (
+                        <NominationMatchupRow
+                            key={id}
+                            name={nameOf(id)}
+                            record={recordFor(matchupsById[id] ?? [])}
+                            matchups={[...(matchupsById[id] ?? [])].sort(
+                                (a, b) => (rankIndex.get(a.opponent) ?? 0) - (rankIndex.get(b.opponent) ?? 0)
+                            )}
+                            nameOf={nameOf}
+                            isWinner={id === rp.winnerId}
+                        />
+                    ))}
                 </div>
             )}
 
@@ -194,6 +191,72 @@ function HeadToHeadCard({ rp, nameOf }: { rp: RankedPairsResult; nameOf: (id: st
                     </div>
                 )}
             </div>
+        </div>
+    );
+}
+
+const RESULT_STYLE: Record<Matchup['result'], { verb: string; color: string }> = {
+    beats: { verb: 'beat', color: 'text-green-700' },
+    loses: { verb: 'lost to', color: 'text-gray-500' },
+    ties: { verb: 'tied', color: 'text-gray-500' },
+};
+
+function NominationMatchupRow({
+    name,
+    record,
+    matchups,
+    nameOf,
+    isWinner,
+}: {
+    name: string;
+    record: string;
+    matchups: Matchup[];
+    nameOf: (id: string) => string;
+    isWinner: boolean;
+}) {
+    const [open, setOpen] = useState(false);
+
+    return (
+        <div className="py-2">
+            <button
+                onClick={() => setOpen(v => !v)}
+                className="w-full flex items-center gap-2 text-sm text-left"
+                aria-expanded={open}
+            >
+                <span className={`text-gray-400 text-xs transition-transform ${open ? 'rotate-90' : ''}`}>
+                    &rsaquo;
+                </span>
+                <span className="font-bold">{name}</span>
+                {isWinner && (
+                    <span className="text-[10px] uppercase tracking-wider bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                        winner
+                    </span>
+                )}
+                <span className="ml-auto font-mono text-xs text-gray-500">{record}</span>
+            </button>
+            {open && (
+                <div className="mt-2 ml-4 pl-3 border-l border-gray-100 space-y-1.5">
+                    {matchups.map(m => {
+                        const style = RESULT_STYLE[m.result];
+                        return (
+                            <div key={m.opponent} className="text-xs">
+                                <div className="flex items-center gap-2">
+                                    <span className={style.color}>{style.verb}</span>
+                                    <span className="text-gray-700">{nameOf(m.opponent)}</span>
+                                    <span className="ml-auto font-mono text-gray-400">
+                                        {m.votesFor}–{m.votesAgainst}
+                                    </span>
+                                </div>
+                                {m.skipped && (
+                                    <div className="mt-0.5 text-[10px] text-amber-600">
+                                        Not used — locking this would create a cycle
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }
