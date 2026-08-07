@@ -13,7 +13,6 @@ export const BIRD_CATALOG = [
   { slug: "california_scrub_jay", filename: "california_scrub_jay.jpeg" },
   { slug: "canadian_goose", filename: "canadian_goose.jpeg" },
   { slug: "cardinal", filename: "cardinal.png" },
-  { slug: "carolina_wren", filename: "carolina_wren.jpeg" },
   { slug: "cedar_waxwing", filename: "cedar_waxwing.jpeg" },
   { slug: "chaffinch", filename: "chaffinch.png" },
   { slug: "common_moorhen", filename: "common_moorhen.jpeg" },
@@ -82,11 +81,6 @@ export const APP_CATALOG = [
     slug: "eastern_bluebird",
     filename: "eastern_bluebird.jpeg",
     title: "Blackjack Trainer",
-  },
-  {
-    slug: "carolina_wren",
-    filename: "carolina_wren.jpeg",
-    title: "Chore Tracker",
   },
 ] as const;
 

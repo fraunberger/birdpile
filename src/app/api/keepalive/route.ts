@@ -11,19 +11,10 @@ export async function GET(req: Request) {
   }
 
   const supabase = getSupabaseAdmin();
-  const [chores, elections] = await Promise.all([
-    supabase.from("chores").select("id").limit(1),
-    supabase.from("elections").select("id").limit(1),
-  ]);
+  const { error } = await supabase.from("elections").select("id").limit(1);
 
-  if (chores.error || elections.error) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: chores.error?.message ?? elections.error?.message,
-      },
-      { status: 500 },
-    );
+  if (error) {
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, ts: new Date().toISOString() });

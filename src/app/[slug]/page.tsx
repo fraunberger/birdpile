@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { BlackjackTrainer } from "@/components/blackjack-trainer/BlackjackTrainer";
 import { BillSplitter } from "@/components/bill-splitter/BillSplitter";
 import { RestaurantVotingApp } from "@/components/pileated-woodpecker-election/RestaurantVotingApp";
-import { MikesGate } from "@/components/chore-tracker/MikesGate";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -47,21 +46,6 @@ export default async function BirdAppPage({
 
   if (isElection) {
     return <RestaurantVotingApp />;
-  }
-
-  const isChoreTracker = slug === "carolina_wren";
-  if (isChoreTracker) {
-    return (
-      <div className="min-h-screen bg-white font-mono text-black p-4">
-        <Link href="/" className="inline-flex items-center gap-2 mb-6 hover:opacity-70 transition-opacity group">
-          <span className="text-xl group-hover:-translate-x-1 transition-transform">&larr;</span>
-          <div className="relative w-12 h-8">
-            <Image src="/logo.png" alt="Apps" fill className="object-contain" />
-          </div>
-        </Link>
-        <MikesGate />
-      </div>
-    );
   }
 
   notFound();
