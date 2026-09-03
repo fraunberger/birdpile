@@ -13,12 +13,11 @@ type Stretch = {
     motion: Motion;
 };
 
-type Phase = "idle" | "stretch" | "rest" | "done";
+type Phase = "idle" | "stretch" | "done";
 
 // --- Constants ---
 
 const STRETCH_SECONDS = 30;
-const REST_SECONDS = 5;
 
 const STRETCHES: Stretch[] = [
     {
@@ -52,6 +51,23 @@ const STRETCHES: Stretch[] = [
         motion: "slide",
     },
 ];
+
+// Side-on moves read as nothing at all from the front, so the bird turns to
+// profile for those and faces you for the lateral ones.
+const PROFILE_MOTIONS: ReadonlySet<Motion> = new Set<Motion>(["nod", "chicken"]);
+
+// Where each move hinges. Nodding and turning happen up at the base of the
+// skull; tilting and the low sweep bend the whole neck from the shoulders.
+const SKULL_BASE = "100px 86px";
+const NECK_BASE = "100px 114px";
+const MOTION_PIVOT: Record<Motion, string> = {
+    nod: SKULL_BASE,
+    shake: SKULL_BASE,
+    ears: NECK_BASE,
+    arc: NECK_BASE,
+    chicken: NECK_BASE,
+    slide: NECK_BASE,
+};
 
 // --- Helpers ---
 
@@ -112,7 +128,7 @@ export function NeckStretch() {
     const beep = useBeep(soundOn);
 
     const current = STRETCHES[index];
-    const phaseLength = (phase === "rest" ? REST_SECONDS : STRETCH_SECONDS) * 1000;
+    const isLast = index === STRETCHES.length - 1;
 
     // Keep the screen awake while a session is running, where supported.
     useEffect(() => {
@@ -135,7 +151,7 @@ export function NeckStretch() {
 
     // The clock. Deadline based so a backgrounded tab doesn't drift.
     useEffect(() => {
-        if (!running || (phase !== "stretch" && phase !== "rest")) return;
+        if (!running || phase !== "stretch") return;
 
         deadlineRef.current = performance.now() + remaining;
 
@@ -146,22 +162,15 @@ export function NeckStretch() {
                 return;
             }
 
-            if (phase === "stretch") {
-                const isLast = index === STRETCHES.length - 1;
-                if (isLast) {
-                    beep(3);
-                    setRunning(false);
-                    setPhase("done");
-                    setRemaining(0);
-                } else {
-                    beep(1);
-                    setPhase("rest");
-                    setRemaining(REST_SECONDS * 1000);
-                }
+            if (index === STRETCHES.length - 1) {
+                beep(3);
+                setRunning(false);
+                setPhase("done");
+                setRemaining(0);
             } else {
+                // Straight into the next one — no gap, no preview.
                 beep(2);
                 setIndex((i) => i + 1);
-                setPhase("stretch");
                 setRemaining(STRETCH_SECONDS * 1000);
             }
         };
@@ -189,26 +198,20 @@ export function NeckStretch() {
     };
 
     const skip = () => {
-        const isLast = index === STRETCHES.length - 1;
-        if (phase === "rest") {
-            setIndex((i) => i + 1);
-            setPhase("stretch");
-            setRemaining(STRETCH_SECONDS * 1000);
-            return;
-        }
         if (isLast) {
             setRunning(false);
             setPhase("done");
             setRemaining(0);
             return;
         }
-        setPhase("rest");
-        setRemaining(REST_SECONDS * 1000);
+        setIndex((i) => i + 1);
+        setRemaining(STRETCH_SECONDS * 1000);
     };
 
-    const active = phase === "stretch" || phase === "rest";
-    const progress = active ? 1 - Math.min(1, Math.max(0, remaining / phaseLength)) : 0;
-    const nextStretch = STRETCHES[Math.min(index + 1, STRETCHES.length - 1)];
+    const active = phase === "stretch";
+    const progress = active
+        ? 1 - Math.min(1, Math.max(0, remaining / (STRETCH_SECONDS * 1000)))
+        : 0;
 
     return (
         <div className="w-full max-w-md mx-auto font-mono text-black">
@@ -221,13 +224,12 @@ export function NeckStretch() {
 
             <div className="mt-6 border border-black">
                 <div className="p-6 flex flex-col items-center">
-                    <BirdHead
-                        motion={phase === "stretch" ? current.motion : null}
-                        paused={!running}
-                    />
+                    <BirdHead motion={active ? current.motion : null} paused={!running} />
 
-                    <Ring progress={progress} muted={phase === "rest"}>
-                        {phase === "idle" && <span className="text-4xl font-bold">{STRETCH_SECONDS}</span>}
+                    <Ring progress={progress}>
+                        {phase === "idle" && (
+                            <span className="text-4xl font-bold">{STRETCH_SECONDS}</span>
+                        )}
                         {phase === "done" && <span className="text-3xl font-bold">done</span>}
                         {active && (
                             <span className="text-5xl font-bold tabular-nums">
@@ -245,22 +247,13 @@ export function NeckStretch() {
                                 </p>
                             </>
                         )}
-                        {phase === "stretch" && (
+                        {active && (
                             <>
                                 <p className="text-xs uppercase tracking-widest text-gray-500">
                                     {index + 1} of {STRETCHES.length}
                                 </p>
                                 <p className="text-lg font-bold mt-1">{current.name}</p>
                                 <p className="text-sm text-gray-500 mt-1">{current.cue}</p>
-                            </>
-                        )}
-                        {phase === "rest" && (
-                            <>
-                                <p className="text-xs uppercase tracking-widest text-gray-500">
-                                    Switch
-                                </p>
-                                <p className="text-lg font-bold mt-1">Next: {nextStretch.name}</p>
-                                <p className="text-sm text-gray-500 mt-1">{nextStretch.cue}</p>
                             </>
                         )}
                         {phase === "done" && (
@@ -333,20 +326,17 @@ export function NeckStretch() {
 
                 <ol className="border-t border-black divide-y divide-gray-200">
                     {STRETCHES.map((stretch, i) => {
-                        const isCurrent = phase === "stretch" && i === index;
-                        const isNext = phase === "rest" && i === index + 1;
-                        const isDone = phase === "done" || i < index || (phase === "rest" && i === index);
+                        const isCurrent = active && i === index;
+                        const isDone = phase === "done" || i < index;
                         return (
                             <li
                                 key={stretch.name}
                                 className={`flex items-center gap-3 px-4 py-2 text-sm ${
-                                    isCurrent || isNext ? "bg-black text-white" : ""
-                                } ${isDone && !isCurrent && !isNext ? "text-gray-400" : ""}`}
+                                    isCurrent ? "bg-black text-white" : ""
+                                } ${isDone ? "text-gray-400" : ""}`}
                             >
                                 <span className="w-4 text-xs tabular-nums opacity-60">{i + 1}</span>
-                                <span className={isDone && !isCurrent && !isNext ? "line-through" : ""}>
-                                    {stretch.name}
-                                </span>
+                                <span className={isDone ? "line-through" : ""}>{stretch.name}</span>
                             </li>
                         );
                     })}
@@ -358,15 +348,7 @@ export function NeckStretch() {
 
 // --- Pieces ---
 
-function Ring({
-    progress,
-    muted,
-    children,
-}: {
-    progress: number;
-    muted: boolean;
-    children: React.ReactNode;
-}) {
+function Ring({ progress, children }: { progress: number; children: React.ReactNode }) {
     const size = 180;
     const stroke = 6;
     const radius = (size - stroke) / 2;
@@ -388,7 +370,7 @@ function Ring({
                     cy={size / 2}
                     r={radius}
                     fill="none"
-                    stroke={muted ? "#9ca3af" : "#000"}
+                    stroke="#000"
                     strokeWidth={stroke}
                     strokeDasharray={circumference}
                     strokeDashoffset={circumference * (1 - progress)}
@@ -401,73 +383,135 @@ function Ring({
 }
 
 function BirdHead({ motion, paused }: { motion: Motion | null; paused: boolean }) {
+    const profile = motion !== null && PROFILE_MOTIONS.has(motion);
+    const playState = paused ? ("paused" as const) : ("running" as const);
+    const pivot = motion ? MOTION_PIVOT[motion] : NECK_BASE;
+    // Nodding and turning happen on top of a neck that stays where it is;
+    // everything else carries the neck along with the head.
+    const neckMoves = motion !== "nod" && motion !== "shake";
+    const neck = (
+        <path d="M100 116 L100 82" stroke="#000" strokeWidth={9} strokeLinecap="round" />
+    );
+
     return (
-        <svg width={200} height={120} viewBox="0 0 200 120" aria-hidden="true">
-            {/* shoulders stay put; only the head moves */}
+        <svg width={200} height={140} viewBox="0 0 200 140" aria-hidden="true">
+            {/* Shoulders stay put. Only the head moves. */}
             <path
-                d="M40 116 Q100 92 160 116"
+                d={profile ? "M50 134 Q100 110 150 134" : "M40 134 Q100 108 160 134"}
                 fill="none"
                 stroke="#000"
                 strokeWidth={3}
                 strokeLinecap="round"
             />
+
+
+            {!neckMoves && neck}
+
             <g
                 className={motion ? `ns-${motion}` : undefined}
-                style={{
-                    transformOrigin: "100px 104px",
-                    animationPlayState: paused ? "paused" : "running",
-                }}
+                style={{ transformOrigin: pivot, animationPlayState: playState }}
             >
-                {/* neck */}
-                <path d="M100 104 L100 74" stroke="#000" strokeWidth={8} strokeLinecap="round" />
-                {/* head */}
-                <circle cx={100} cy={50} r={26} fill="#fff" stroke="#000" strokeWidth={3} />
-                {/* eyes */}
-                <circle cx={90} cy={45} r={3.2} fill="#000" />
-                <circle cx={110} cy={45} r={3.2} fill="#000" />
-                {/* beak */}
-                <path d="M100 54 L94 63 L106 63 Z" fill="#f59e0b" stroke="#000" strokeWidth={2} />
+                {neckMoves && neck}
+
+                {/* Narrows as the bird turns away from you, without squashing
+                    the eyes — they live outside this group. */}
+                <g
+                    className={motion === "shake" ? "ns-shake-head" : undefined}
+                    style={{ transformOrigin: "100px 58px", animationPlayState: playState }}
+                >
+                    <circle cx={100} cy={58} r={27} fill="#fff" stroke="#000" strokeWidth={3} />
+                </g>
+
+                {profile ? (
+                    <>
+                        {/* Facing right: one eye, beak off the front of the head. */}
+                        <circle cx={111} cy={52} r={3.4} fill="#000" />
+                        <path
+                            d="M124 54 L150 60 L124 66 Z"
+                            fill="#f59e0b"
+                            stroke="#000"
+                            strokeWidth={2}
+                            strokeLinejoin="round"
+                        />
+                    </>
+                ) : (
+                    // Facing you: the features slide within the head when the
+                    // bird turns, which is what selling a "no" shake takes.
+                    <g
+                        className={motion === "shake" ? "ns-shake-face" : undefined}
+                        style={{ transformOrigin: pivot, animationPlayState: playState }}
+                    >
+                        <circle cx={89} cy={53} r={3.4} fill="#000" />
+                        <circle cx={111} cy={53} r={3.4} fill="#000" />
+                        <path
+                            d="M100 62 L92 74 L108 74 Z"
+                            fill="#f59e0b"
+                            stroke="#000"
+                            strokeWidth={2}
+                            strokeLinejoin="round"
+                        />
+                    </g>
+                )}
             </g>
         </svg>
     );
 }
 
-// Slow, loop-forever pacers — one per motion. Roughly a five-second cycle,
-// which is about as fast as any of these should ever be done.
+// Slow, loop-forever pacers — one per motion, each pivoting at the neck base.
+// Roughly a five-second cycle, about as fast as any of these should be done.
 const ANIMATION_CSS = `
+/* Profile: beak swings up to the sky, chin drops to the chest. */
 @keyframes ns-nod {
-  0%, 100% { transform: translateY(-8px) rotate(0deg) scaleY(1.06); }
-  50%      { transform: translateY(8px) rotate(0deg) scaleY(0.94); }
-}
-@keyframes ns-shake {
-  0%, 100% { transform: translateX(-16px) rotate(-4deg); }
-  50%      { transform: translateX(16px) rotate(4deg); }
-}
-@keyframes ns-ears {
   0%, 100% { transform: rotate(-20deg); }
-  50%      { transform: rotate(20deg); }
+  50%      { transform: rotate(22deg); }
 }
+/* Front: the head turns — features swing across, the face narrows. */
+@keyframes ns-shake {
+  0%, 100% { transform: rotate(-5deg) translateX(-8px); }
+  25%, 75% { transform: rotate(0deg) translateX(0px); }
+  50%      { transform: rotate(5deg) translateX(8px); }
+}
+@keyframes ns-shake-head {
+  0%, 100% { transform: scaleX(0.86); }
+  25%, 75% { transform: scaleX(1); }
+  50%      { transform: scaleX(0.86); }
+}
+@keyframes ns-shake-face {
+  0%, 100% { transform: translateX(-8px); }
+  50%      { transform: translateX(8px); }
+}
+/* Front: ear to the sky, then the other one. */
+@keyframes ns-ears {
+  0%, 100% { transform: rotate(-24deg); }
+  50%      { transform: rotate(24deg); }
+}
+/* Front: chin sweeps the low arc, shoulder to shoulder and back. */
 @keyframes ns-arc {
-  0%, 100% { transform: translate(-20px, -2px) rotate(-22deg); }
-  25%      { transform: translate(-12px, 10px) rotate(-12deg); }
-  50%      { transform: translate(0px, 14px) rotate(0deg); }
-  75%      { transform: translate(12px, 10px) rotate(12deg); }
+  0%, 100% { transform: rotate(-28deg) translateY(0px); }
+  25%      { transform: rotate(-15deg) translateY(4px); }
+  50%      { transform: rotate(0deg) translateY(7px); }
+  75%      { transform: rotate(15deg) translateY(4px); }
 }
+/* Profile: chin juts forward, then tucks straight back. */
 @keyframes ns-chicken {
-  0%, 100% { transform: translateY(-4px) scale(1.1); }
-  50%      { transform: translateY(4px) scale(0.92); }
+  0%, 100% { transform: translateX(16px); }
+  50%      { transform: translateX(-14px); }
 }
+/* Front: head slides sideways, level, over still shoulders. */
 @keyframes ns-slide {
-  0%, 100% { transform: translateX(-20px); }
-  50%      { transform: translateX(20px); }
+  0%, 100% { transform: translateX(-26px); }
+  50%      { transform: translateX(26px); }
 }
-.ns-nod     { animation: ns-nod 5s ease-in-out infinite; }
-.ns-shake   { animation: ns-shake 5s ease-in-out infinite; }
-.ns-ears    { animation: ns-ears 5s ease-in-out infinite; }
-.ns-arc     { animation: ns-arc 6s ease-in-out infinite; }
-.ns-chicken { animation: ns-chicken 4.5s ease-in-out infinite; }
-.ns-slide   { animation: ns-slide 4.5s ease-in-out infinite; }
+.ns-nod        { animation: ns-nod 5s ease-in-out infinite; }
+.ns-shake      { animation: ns-shake 5s ease-in-out infinite; }
+.ns-shake-head { animation: ns-shake-head 5s ease-in-out infinite; }
+.ns-shake-face { animation: ns-shake-face 5s ease-in-out infinite; }
+.ns-ears       { animation: ns-ears 5s ease-in-out infinite; }
+.ns-arc        { animation: ns-arc 6s ease-in-out infinite; }
+.ns-chicken    { animation: ns-chicken 4.5s ease-in-out infinite; }
+.ns-slide      { animation: ns-slide 4.5s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .ns-nod, .ns-shake, .ns-ears, .ns-arc, .ns-chicken, .ns-slide { animation: none; }
+  .ns-nod, .ns-shake, .ns-shake-head, .ns-shake-face, .ns-ears,
+  .ns-arc, .ns-chicken, .ns-slide { animation: none; }
 }
 `;
