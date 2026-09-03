@@ -198,8 +198,6 @@ export function NeckStretch() {
 
     return (
         <div className="w-full max-w-md mx-auto font-mono text-black">
-            <style>{ANIMATION_CSS}</style>
-
             <h1 className="text-2xl font-bold tracking-tight">Neck Stretch</h1>
             <p className="text-sm text-gray-500 mt-1">
                 Six moves, {STRETCH_SECONDS} seconds each. Slow cadence — whatever feels good.
@@ -207,7 +205,11 @@ export function NeckStretch() {
 
             <div className="mt-6 border border-black">
                 <div className="p-6 flex flex-col items-center">
-                    <Bird motion={active ? current.motion : null} paused={!running} />
+                    <Bird
+                        key={active ? current.motion : "resting"}
+                        motion={active ? current.motion : null}
+                        paused={!running}
+                    />
 
                     <Ring progress={progress}>
                         {phase === "idle" && (
@@ -368,15 +370,18 @@ function Ring({ progress, children }: { progress: number; children: React.ReactN
 // --- The bird ---
 
 type Choreo = {
-    /** Side-on moves are invisible head-on, so the swan turns to profile. */
-    profile: boolean;
+    /** Nodding and the chicken are invisible head-on, so the swan looks away. */
+    facing: "profile" | "you";
     seconds: number;
     /** Degrees each neck joint swings, from the body up. They accumulate. */
     joints: [number, number, number, number];
     /** Degrees the head swings on top of the neck. */
     head: number;
-    /** Pixels the whole neck sinks as the chin passes the middle. */
-    dip?: number;
+    /** The chin rides low through the middle of a sweep: pixels the neck
+     *  lifts at the shoulder ends and drops as it crosses the centre. The
+     *  drop is bounded by how far the neck's base can sink and stay hidden
+     *  inside the body. */
+    dip?: { lift: number; drop: number };
     /** The head turns away from you instead of bending. */
     turn?: boolean;
 };
@@ -385,75 +390,100 @@ type Choreo = {
 // whole neck bends. Opposite-sign joints stack into an S-curve, which carries
 // the head sideways with its eyes dead level: the chicken and the Janet.
 const CHOREO: Record<Motion, Choreo> = {
-    nod: { profile: true, seconds: 5, joints: [5, 8, 11, 14], head: 14 },
-    shake: { profile: false, seconds: 5, joints: [3, 4, 5, 6], head: 5, turn: true },
-    ears: { profile: false, seconds: 5, joints: [6, 8, 9, 10], head: 8 },
-    arc: { profile: false, seconds: 6, joints: [9, 11, 12, 13], head: 6, dip: 26 },
-    chicken: { profile: true, seconds: 4.5, joints: [20, 12, -12, -20], head: 0 },
-    slide: { profile: false, seconds: 4.5, joints: [18, 10, -10, -18], head: 0 },
+    nod: { facing: "profile", seconds: 5, joints: [5, 8, 11, 14], head: 14 },
+    shake: { facing: "you", seconds: 5, joints: [3, 4, 5, 6], head: 5, turn: true },
+    ears: { facing: "you", seconds: 5, joints: [6, 8, 9, 10], head: 8 },
+    arc: { facing: "you", seconds: 6, joints: [9, 11, 12, 13], head: 6, dip: { lift: 10, drop: 19 } },
+    chicken: { facing: "profile", seconds: 4.5, joints: [20, 12, -12, -20], head: 0 },
+    slide: { facing: "you", seconds: 4.5, joints: [18, 10, -10, -18], head: 0 },
 };
 
-// Neck joints from the body up; the last is where the head sits. The profile
-// pose keeps the swan's S-curve, so the neck bends from a real rest shape.
-const PROFILE_JOINTS: ReadonlyArray<readonly [number, number]> = [
+// Neck joints from the body up; the last is where the head sits. The swan's
+// S-curve is the rest pose, so every bend starts from a real neck shape.
+const JOINTS: ReadonlyArray<readonly [number, number]> = [
     [128, 142],
     [120, 120],
     [120, 98],
     [128, 78],
     [136, 62],
 ];
-const FRONT_JOINTS: ReadonlyArray<readonly [number, number]> = [
-    [110, 142],
-    [110, 120],
-    [110, 98],
-    [110, 78],
-    [110, 62],
-];
 const JOINT_WIDTHS = [13, 11, 10, 9];
 const PROFILE_HEAD: readonly [number, number] = [139, 50];
-const FRONT_HEAD: readonly [number, number] = [110, 50];
+const FACING_HEAD: readonly [number, number] = [136, 48];
 
-// Custom properties are how each joint gets its own swing out of one keyframe
-// block; React's style typings don't know about them.
-function vars(style: Record<string, string | number>): React.CSSProperties {
-    return style as React.CSSProperties;
+// A slow ease in and out of each end of the swing.
+const EASE = "0.42 0 0.58 1";
+
+/**
+ * One oscillation as SMIL rather than CSS: the pivot rides along in the value
+ * itself (no transform-origin to get wrong), no stylesheet has to arrive for
+ * it to run, and — the whole point of this app — the browser's reduce-motion
+ * setting does not silently freeze the demonstration you came here to copy.
+ */
+function Swing({
+    degrees,
+    pivot,
+    seconds,
+}: {
+    degrees: number;
+    pivot: readonly [number, number];
+    seconds: number;
+}) {
+    const at = `${pivot[0]} ${pivot[1]}`;
+    return (
+        <animateTransform
+            attributeName="transform"
+            attributeType="XML"
+            type="rotate"
+            values={`${degrees} ${at};${-degrees} ${at};${degrees} ${at}`}
+            keyTimes="0;0.5;1"
+            calcMode="spline"
+            keySplines={`${EASE};${EASE}`}
+            dur={`${seconds}s`}
+            repeatCount="indefinite"
+        />
+    );
 }
 
 function Bird({ motion, paused }: { motion: Motion | null; paused: boolean }) {
+    const svgRef = useRef<SVGSVGElement>(null);
     const choreo = motion ? CHOREO[motion] : null;
-    const profile = choreo?.profile ?? true;
-    const joints = profile ? PROFILE_JOINTS : FRONT_JOINTS;
+    const seconds = choreo?.seconds ?? 5;
+
+    // Pause and resume the whole timeline in place, so the swan holds the pose
+    // it was in rather than snapping back to rest.
+    useEffect(() => {
+        const svg = svgRef.current;
+        if (!svg) return;
+        if (paused) svg.pauseAnimations();
+        else svg.unpauseAnimations();
+    }, [paused]);
 
     // Build the head first, then wrap a joint around it for each vertebra, so
     // every joint carries everything above it. The neck bends; it does not
     // swing as one stick.
     let neck: React.ReactNode = (
-        <g
-            className="ns-swing"
-            style={vars({
-                transformOrigin: `${joints[4][0]}px ${joints[4][1]}px`,
-                "--a": `${choreo?.head ?? 0}deg`,
-            })}
-        >
+        <g>
+            {choreo && (
+                <Swing degrees={choreo.head} pivot={JOINTS[4]} seconds={seconds} />
+            )}
             <Head
-                at={profile ? PROFILE_HEAD : FRONT_HEAD}
-                profile={profile}
+                at={choreo?.facing === "you" ? FACING_HEAD : PROFILE_HEAD}
+                facing={choreo?.facing ?? "profile"}
                 turning={choreo?.turn ?? false}
+                seconds={seconds}
             />
         </g>
     );
     for (let i = JOINT_WIDTHS.length - 1; i >= 0; i--) {
-        const [x0, y0] = joints[i];
-        const [x1, y1] = joints[i + 1];
+        const [x0, y0] = JOINTS[i];
+        const [x1, y1] = JOINTS[i + 1];
         const above = neck;
         neck = (
-            <g
-                className="ns-swing"
-                style={vars({
-                    transformOrigin: `${x0}px ${y0}px`,
-                    "--a": `${choreo?.joints[i] ?? 0}deg`,
-                })}
-            >
+            <g>
+                {choreo && (
+                    <Swing degrees={choreo.joints[i]} pivot={JOINTS[i]} seconds={seconds} />
+                )}
                 <path
                     d={`M${x0} ${y0} L${x1} ${y1}`}
                     stroke="#000"
@@ -466,73 +496,40 @@ function Bird({ motion, paused }: { motion: Motion | null; paused: boolean }) {
     }
 
     return (
-        <svg
-            className={paused ? "ns-bird ns-paused" : "ns-bird"}
-            width={220}
-            height={176}
-            viewBox="0 0 220 176"
-            aria-hidden="true"
-            style={vars({
-                "--dur": `${choreo?.seconds ?? 5}s`,
-                "--dip": `${choreo?.dip ?? 0}px`,
-            })}
-        >
-            {/* Neck goes down first, so the body covers where it joins on. */}
-            <g className={choreo?.dip ? "ns-dip" : undefined}>{neck}</g>
+        <svg ref={svgRef} width={220} height={176} viewBox="0 0 220 176" aria-hidden="true">
+            {/* The neck goes down first, so the body covers where it joins on. */}
+            <g>
+                {choreo?.dip && (
+                    <animateTransform
+                        attributeName="transform"
+                        attributeType="XML"
+                        type="translate"
+                        values={`0 ${-choreo.dip.lift};0 ${choreo.dip.drop};0 ${-choreo.dip.lift};0 ${choreo.dip.drop};0 ${-choreo.dip.lift}`}
+                        keyTimes="0;0.25;0.5;0.75;1"
+                        calcMode="spline"
+                        keySplines={`${EASE};${EASE};${EASE};${EASE}`}
+                        dur={`${seconds}s`}
+                        repeatCount="indefinite"
+                    />
+                )}
+                {neck}
+            </g>
 
-            {profile ? (
-                <>
-                    <path
-                        d="M66 132 L34 112 L62 148 Z"
-                        fill="#fff"
-                        stroke="#000"
-                        strokeWidth={3}
-                        strokeLinejoin="round"
-                    />
-                    <ellipse
-                        cx={104}
-                        cy={144}
-                        rx={52}
-                        ry={25}
-                        fill="#fff"
-                        stroke="#000"
-                        strokeWidth={3}
-                    />
-                    <path
-                        d="M82 140 C96 126 128 128 142 144"
-                        fill="none"
-                        stroke="#000"
-                        strokeWidth={2.5}
-                        strokeLinecap="round"
-                    />
-                </>
-            ) : (
-                <>
-                    <ellipse
-                        cx={110}
-                        cy={146}
-                        rx={46}
-                        ry={26}
-                        fill="#fff"
-                        stroke="#000"
-                        strokeWidth={3}
-                    />
-                    <path
-                        d="M84 134 C70 146 70 160 82 168"
-                        fill="none"
-                        stroke="#000"
-                        strokeWidth={2.5}
-                        strokeLinecap="round"
-                    />
-                    <path
-                        d="M136 134 C150 146 150 160 138 168"
-                        fill="none"
-                        stroke="#000"
-                        strokeWidth={2.5}
-                        strokeLinecap="round"
-                    />
-                </>
-            )}
+            <path
+                d="M66 132 L34 112 L62 148 Z"
+                fill="#fff"
+                stroke="#000"
+                strokeWidth={3}
+                strokeLinejoin="round"
+            />
+            <ellipse cx={104} cy={144} rx={52} ry={25} fill="#fff" stroke="#000" strokeWidth={3} />
+            <path
+                d="M82 140 C96 126 128 128 142 144"
+                fill="none"
+                stroke="#000"
+                strokeWidth={2.5}
+                strokeLinecap="round"
+            />
 
             {/* Water, so the body has something to sit still on. */}
             <path d="M10 158 H46" stroke="#d1d5db" strokeWidth={2.5} strokeLinecap="round" />
@@ -545,37 +542,47 @@ function Bird({ motion, paused }: { motion: Motion | null; paused: boolean }) {
 
 function Head({
     at,
-    profile,
+    facing,
     turning,
+    seconds,
 }: {
     at: readonly [number, number];
-    profile: boolean;
+    facing: "profile" | "you";
     turning: boolean;
+    seconds: number;
 }) {
     const [x, y] = at;
-    return (
-        <g
-            className={turning ? "ns-squeeze" : undefined}
-            style={{ transformOrigin: `${x}px ${y}px` }}
-        >
-            <circle cx={x} cy={y} r={15} fill="#fff" stroke="#000" strokeWidth={3} />
 
-            {profile ? (
-                <>
-                    <circle cx={x + 5} cy={y - 4} r={2.4} fill="#000" />
-                    <path
-                        d={`M${x + 12} ${y - 4} L${x + 31} ${y + 1} L${x + 12} ${y + 6} Z`}
-                        fill="#f59e0b"
-                        stroke="#000"
-                        strokeWidth={2}
-                        strokeLinejoin="round"
-                    />
-                </>
-            ) : (
-                <g
-                    className={turning ? "ns-face" : undefined}
-                    style={{ transformOrigin: `${x}px ${y}px` }}
-                >
+    const face =
+        facing === "profile" ? (
+            <>
+                <circle cx={x} cy={y} r={15} fill="#fff" stroke="#000" strokeWidth={3} />
+                <circle cx={x + 5} cy={y - 4} r={2.4} fill="#000" />
+                <path
+                    d={`M${x + 12} ${y - 4} L${x + 31} ${y + 1} L${x + 12} ${y + 6} Z`}
+                    fill="#f59e0b"
+                    stroke="#000"
+                    strokeWidth={2}
+                    strokeLinejoin="round"
+                />
+            </>
+        ) : (
+            <>
+                <circle cx={x} cy={y} r={15} fill="#fff" stroke="#000" strokeWidth={3} />
+                <g>
+                    {turning && (
+                        <animateTransform
+                            attributeName="transform"
+                            attributeType="XML"
+                            type="translate"
+                            values="-8 0;8 0;-8 0"
+                            keyTimes="0;0.5;1"
+                            calcMode="spline"
+                            keySplines={`${EASE};${EASE}`}
+                            dur={`${seconds}s`}
+                            repeatCount="indefinite"
+                        />
+                    )}
                     <circle cx={x - 6} cy={y - 4} r={2.4} fill="#000" />
                     <circle cx={x + 6} cy={y - 4} r={2.4} fill="#000" />
                     <path
@@ -586,45 +593,29 @@ function Head({
                         strokeLinejoin="round"
                     />
                 </g>
-            )}
+            </>
+        );
+
+    if (!turning) return face;
+
+    // Foreshorten the skull as it turns away from you. Scaling has no pivot of
+    // its own in SMIL, so the head is moved to the origin and back around it.
+    return (
+        <g transform={`translate(${x} ${y})`}>
+            <g>
+                <animateTransform
+                    attributeName="transform"
+                    attributeType="XML"
+                    type="scale"
+                    values="0.7 1;1 1;0.7 1;1 1;0.7 1"
+                    keyTimes="0;0.25;0.5;0.75;1"
+                    calcMode="spline"
+                    keySplines={`${EASE};${EASE};${EASE};${EASE}`}
+                    dur={`${seconds}s`}
+                    repeatCount="indefinite"
+                />
+                <g transform={`translate(${-x} ${-y})`}>{face}</g>
+            </g>
         </g>
     );
 }
-
-// One slow oscillation, shared by every joint: each element supplies its own
-// swing in --a, so a move's shape comes from the choreography above rather
-// than from a wall of per-move keyframes.
-const ANIMATION_CSS = `
-@keyframes ns-swing {
-  0%, 100% { transform: rotate(var(--a, 0deg)); }
-  50%      { transform: rotate(calc(-1 * var(--a, 0deg))); }
-}
-/* The chin dips each time it passes the middle of the sweep. */
-@keyframes ns-dip {
-  0%, 50%, 100% { transform: translateY(0); }
-  25%, 75%      { transform: translateY(var(--dip, 0px)); }
-}
-@keyframes ns-squeeze {
-  0%, 100% { transform: scaleX(0.7); }
-  25%, 75% { transform: scaleX(1); }
-  50%      { transform: scaleX(0.7); }
-}
-@keyframes ns-face {
-  0%, 100% { transform: translateX(-8px); }
-  50%      { transform: translateX(8px); }
-}
-.ns-bird .ns-swing   { animation: ns-swing var(--dur, 5s) ease-in-out infinite; }
-.ns-bird .ns-dip     { animation: ns-dip var(--dur, 5s) ease-in-out infinite; }
-.ns-bird .ns-squeeze { animation: ns-squeeze var(--dur, 5s) ease-in-out infinite; }
-.ns-bird .ns-face    { animation: ns-face var(--dur, 5s) ease-in-out infinite; }
-.ns-bird.ns-paused .ns-swing,
-.ns-bird.ns-paused .ns-dip,
-.ns-bird.ns-paused .ns-squeeze,
-.ns-bird.ns-paused .ns-face { animation-play-state: paused; }
-@media (prefers-reduced-motion: reduce) {
-  .ns-bird .ns-swing,
-  .ns-bird .ns-dip,
-  .ns-bird .ns-squeeze,
-  .ns-bird .ns-face { animation: none; }
-}
-`;
