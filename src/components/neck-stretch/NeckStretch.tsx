@@ -377,10 +377,9 @@ type Choreo = {
     joints: [number, number, number, number];
     /** Degrees the head swings on top of the neck. */
     head: number;
-    /** The chin rides low through the middle of a sweep: pixels the neck
-     *  lifts at the shoulder ends and drops as it crosses the centre. The
-     *  drop is bounded by how far the neck's base can sink and stay hidden
-     *  inside the body. */
+    /** The chin rides low through the middle of a sweep: pixels the neck lifts
+     *  at the shoulder ends and drops as it crosses the centre. The drop is
+     *  bounded by how far the neck's base can sink and stay hidden in the body. */
     dip?: { lift: number; drop: number };
     /** The head turns away from you instead of bending. */
     turn?: boolean;
@@ -411,67 +410,94 @@ const JOINT_WIDTHS = [13, 11, 10, 9];
 const PROFILE_HEAD: readonly [number, number] = [139, 50];
 const FACING_HEAD: readonly [number, number] = [136, 48];
 
-// A slow ease in and out of each end of the swing.
-const EASE = "0.42 0 0.58 1";
+const TAU = Math.PI * 2;
 
 /**
- * One oscillation as SMIL rather than CSS: the pivot rides along in the value
- * itself (no transform-origin to get wrong), no stylesheet has to arrive for
- * it to run, and — the whole point of this app — the browser's reduce-motion
- * setting does not silently freeze the demonstration you came here to copy.
+ * Where every moving part sits at a point `p` (0 to 1) through one cycle.
+ *
+ * This is driven from a frame loop rather than declared as CSS or SMIL, and
+ * that is the whole point: CSS animations are switched off entirely by the
+ * viewer's reduce-motion setting, and WebKit does not reliably start SMIL on
+ * an SVG that React mounts after load. Both failures are silent — the swan
+ * renders and simply never moves, which is the one thing this app cannot do.
+ * A frame loop runs wherever React runs.
  */
-function Swing({
-    degrees,
-    pivot,
-    seconds,
-}: {
-    degrees: number;
-    pivot: readonly [number, number];
-    seconds: number;
-}) {
-    const at = `${pivot[0]} ${pivot[1]}`;
-    return (
-        <animateTransform
-            attributeName="transform"
-            attributeType="XML"
-            type="rotate"
-            values={`${degrees} ${at};${-degrees} ${at};${degrees} ${at}`}
-            keyTimes="0;0.5;1"
-            calcMode="spline"
-            keySplines={`${EASE};${EASE}`}
-            dur={`${seconds}s`}
-            repeatCount="indefinite"
-        />
-    );
+function poseAt(choreo: Choreo, p: number): Record<string, string> {
+    const swing = Math.cos(TAU * p); // +1 at one end of the move, -1 at the other
+    const pass = -Math.cos(2 * TAU * p); // -1 at both ends, +1 crossing the middle
+    const pose: Record<string, string> = {};
+
+    choreo.joints.forEach((degrees, i) => {
+        const [x, y] = JOINTS[i];
+        pose[`joint${i}`] = `rotate(${(degrees * swing).toFixed(2)} ${x} ${y})`;
+    });
+
+    const [hx, hy] = JOINTS[4];
+    pose.head = `rotate(${(choreo.head * swing).toFixed(2)} ${hx} ${hy})`;
+
+    if (choreo.dip) {
+        const mid = (choreo.dip.drop - choreo.dip.lift) / 2;
+        const reach = (choreo.dip.drop + choreo.dip.lift) / 2;
+        pose.dip = `translate(0 ${(mid + reach * pass).toFixed(2)})`;
+    }
+
+    if (choreo.turn) {
+        const [x, y] = FACING_HEAD;
+        // The skull foreshortens as it turns away and fills out again as it
+        // comes back through centre. Scale has no pivot of its own, so the
+        // head is walked to the origin and back around it.
+        const squeeze = (0.85 + 0.15 * pass).toFixed(3);
+        pose.squeeze = `translate(${x} ${y}) scale(${squeeze} 1) translate(${-x} ${-y})`;
+        pose.face = `translate(${(-8 * swing).toFixed(2)} 0)`;
+    }
+
+    return pose;
 }
 
 function Bird({ motion, paused }: { motion: Motion | null; paused: boolean }) {
     const svgRef = useRef<SVGSVGElement>(null);
+    const phaseRef = useRef(0);
     const choreo = motion ? CHOREO[motion] : null;
-    const seconds = choreo?.seconds ?? 5;
 
-    // Pause and resume the whole timeline in place, so the swan holds the pose
-    // it was in rather than snapping back to rest.
     useEffect(() => {
         const svg = svgRef.current;
-        if (!svg) return;
-        if (paused) svg.pauseAnimations();
-        else svg.unpauseAnimations();
-    }, [paused]);
+        if (!svg || !choreo || paused) return;
+
+        const parts = Array.from(svg.querySelectorAll<SVGGElement>("[data-slot]"));
+        // Pick the cycle up where a pause left it, rather than snapping to rest.
+        const startedAt = performance.now() - phaseRef.current * choreo.seconds * 1000;
+        let frame = 0;
+
+        const draw = (now: number) => {
+            const cycles = (now - startedAt) / (choreo.seconds * 1000);
+            const p = ((cycles % 1) + 1) % 1;
+            phaseRef.current = p;
+            const pose = poseAt(choreo, p);
+            for (const part of parts) {
+                const transform = pose[part.getAttribute("data-slot") ?? ""];
+                if (transform) part.setAttribute("transform", transform);
+            }
+            frame = requestAnimationFrame(draw);
+        };
+
+        frame = requestAnimationFrame(draw);
+        return () => cancelAnimationFrame(frame);
+    }, [choreo, paused]);
+
+    // The first paint is the start of the cycle, so nothing jumps when the
+    // frame loop takes over — and a still swan still holds a real pose.
+    const rest = choreo ? poseAt(choreo, 0) : {};
 
     // Build the head first, then wrap a joint around it for each vertebra, so
     // every joint carries everything above it. The neck bends; it does not
     // swing as one stick.
     let neck: React.ReactNode = (
-        <g>
-            {choreo && (
-                <Swing degrees={choreo.head} pivot={JOINTS[4]} seconds={seconds} />
-            )}
+        <g data-slot="head" transform={rest.head}>
             <Head
                 at={choreo?.facing === "you" ? FACING_HEAD : PROFILE_HEAD}
                 facing={choreo?.facing ?? "profile"}
                 turning={choreo?.turn ?? false}
-                seconds={seconds}
+                rest={rest}
             />
         </g>
     );
@@ -480,10 +506,7 @@ function Bird({ motion, paused }: { motion: Motion | null; paused: boolean }) {
         const [x1, y1] = JOINTS[i + 1];
         const above = neck;
         neck = (
-            <g>
-                {choreo && (
-                    <Swing degrees={choreo.joints[i]} pivot={JOINTS[i]} seconds={seconds} />
-                )}
+            <g data-slot={`joint${i}`} transform={rest[`joint${i}`]}>
                 <path
                     d={`M${x0} ${y0} L${x1} ${y1}`}
                     stroke="#000"
@@ -498,20 +521,7 @@ function Bird({ motion, paused }: { motion: Motion | null; paused: boolean }) {
     return (
         <svg ref={svgRef} width={220} height={176} viewBox="0 0 220 176" aria-hidden="true">
             {/* The neck goes down first, so the body covers where it joins on. */}
-            <g>
-                {choreo?.dip && (
-                    <animateTransform
-                        attributeName="transform"
-                        attributeType="XML"
-                        type="translate"
-                        values={`0 ${-choreo.dip.lift};0 ${choreo.dip.drop};0 ${-choreo.dip.lift};0 ${choreo.dip.drop};0 ${-choreo.dip.lift}`}
-                        keyTimes="0;0.25;0.5;0.75;1"
-                        calcMode="spline"
-                        keySplines={`${EASE};${EASE};${EASE};${EASE}`}
-                        dur={`${seconds}s`}
-                        repeatCount="indefinite"
-                    />
-                )}
+            <g data-slot="dip" transform={rest.dip}>
                 {neck}
             </g>
 
@@ -544,17 +554,17 @@ function Head({
     at,
     facing,
     turning,
-    seconds,
+    rest,
 }: {
     at: readonly [number, number];
     facing: "profile" | "you";
     turning: boolean;
-    seconds: number;
+    rest: Record<string, string>;
 }) {
     const [x, y] = at;
 
-    const face =
-        facing === "profile" ? (
+    if (facing === "profile") {
+        return (
             <>
                 <circle cx={x} cy={y} r={15} fill="#fff" stroke="#000" strokeWidth={3} />
                 <circle cx={x + 5} cy={y - 4} r={2.4} fill="#000" />
@@ -566,56 +576,31 @@ function Head({
                     strokeLinejoin="round"
                 />
             </>
-        ) : (
-            <>
-                <circle cx={x} cy={y} r={15} fill="#fff" stroke="#000" strokeWidth={3} />
-                <g>
-                    {turning && (
-                        <animateTransform
-                            attributeName="transform"
-                            attributeType="XML"
-                            type="translate"
-                            values="-8 0;8 0;-8 0"
-                            keyTimes="0;0.5;1"
-                            calcMode="spline"
-                            keySplines={`${EASE};${EASE}`}
-                            dur={`${seconds}s`}
-                            repeatCount="indefinite"
-                        />
-                    )}
-                    <circle cx={x - 6} cy={y - 4} r={2.4} fill="#000" />
-                    <circle cx={x + 6} cy={y - 4} r={2.4} fill="#000" />
-                    <path
-                        d={`M${x} ${y + 3} L${x - 7} ${y + 14} L${x + 7} ${y + 14} Z`}
-                        fill="#f59e0b"
-                        stroke="#000"
-                        strokeWidth={2}
-                        strokeLinejoin="round"
-                    />
-                </g>
-            </>
         );
+    }
+
+    const face = (
+        <>
+            <circle cx={x} cy={y} r={15} fill="#fff" stroke="#000" strokeWidth={3} />
+            <g data-slot="face" transform={rest.face}>
+                <circle cx={x - 6} cy={y - 4} r={2.4} fill="#000" />
+                <circle cx={x + 6} cy={y - 4} r={2.4} fill="#000" />
+                <path
+                    d={`M${x} ${y + 3} L${x - 7} ${y + 14} L${x + 7} ${y + 14} Z`}
+                    fill="#f59e0b"
+                    stroke="#000"
+                    strokeWidth={2}
+                    strokeLinejoin="round"
+                />
+            </g>
+        </>
+    );
 
     if (!turning) return face;
 
-    // Foreshorten the skull as it turns away from you. Scaling has no pivot of
-    // its own in SMIL, so the head is moved to the origin and back around it.
     return (
-        <g transform={`translate(${x} ${y})`}>
-            <g>
-                <animateTransform
-                    attributeName="transform"
-                    attributeType="XML"
-                    type="scale"
-                    values="0.7 1;1 1;0.7 1;1 1;0.7 1"
-                    keyTimes="0;0.25;0.5;0.75;1"
-                    calcMode="spline"
-                    keySplines={`${EASE};${EASE};${EASE};${EASE}`}
-                    dur={`${seconds}s`}
-                    repeatCount="indefinite"
-                />
-                <g transform={`translate(${-x} ${-y})`}>{face}</g>
-            </g>
+        <g data-slot="squeeze" transform={rest.squeeze}>
+            {face}
         </g>
     );
 }
