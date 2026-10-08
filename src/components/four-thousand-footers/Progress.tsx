@@ -255,7 +255,7 @@ function SkylineChart({ status, onSelect }: { status: Map<string, PeakStatus>; o
                             <path d={m.outline} fill={bagged ? C.BAGGED_LIT : C.TOGO_LIT} />
                             <path d={m.shade} fill={bagged ? C.BAGGED_SHADE : C.TOGO_SHADE} />
                             <path
-                                d={m.outline}
+                                d={m.ridge}
                                 fill="none"
                                 stroke={bagged ? C.BAGGED_STROKE : hover === m.id ? C.INK : C.MUTED}
                                 strokeWidth={hover === m.id ? 2 : 1}

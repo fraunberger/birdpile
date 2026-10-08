@@ -282,11 +282,25 @@ function Legend() {
             <span className="flex items-center gap-1.5">
                 <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
                     <path d="M1 15 L8 5 L15 15 Z" fill={C.TOGO_LIT} stroke={C.TOGO_STROKE} />
-                    <circle cx="8" cy="5" r="1.6" fill="#fff" stroke={C.TOGO_STROKE} />
                 </svg>
                 To go
             </span>
         </div>
+    );
+}
+
+/**
+ * Solid over the upper slopes, dissolving toward the foot: into the valley
+ * floor for fills (so each ridge stands out of a band of low fog, like a
+ * layered panorama), or to nothing for lines.
+ */
+function Fade({ id, color, to }: { id: string; color: string; to: string | null }) {
+    return (
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={color} />
+            <stop offset="0.45" stopColor={color} />
+            <stop offset="1" stopColor={to ?? color} stopOpacity={to ? 1 : 0} />
+        </linearGradient>
     );
 }
 
@@ -329,16 +343,22 @@ function SceneArt({ scene, clipId }: { scene: Scene; clipId: string }) {
 
             {scene.mounds.map((m) => (
                 <g key={m.id} data-peak={m.id} className="cursor-pointer">
-                    <path d={m.outline} fill={m.fill} />
-                    <path d={m.shade} fill={m.shadeFill} />
+                    <defs>
+                        <Fade id={`${clipId}-${m.id}-lit`} color={m.fill} to={C.GROUND} />
+                        <Fade id={`${clipId}-${m.id}-shade`} color={m.shadeFill} to={C.GROUND} />
+                        <Fade id={`${clipId}-${m.id}-ridge`} color={m.stroke} to={null} />
+                    </defs>
+                    <path d={m.outline} fill={`url(#${clipId}-${m.id}-lit)`} />
+                    <path d={m.shade} fill={`url(#${clipId}-${m.id}-shade)`} />
                     <path
-                        d={m.outline}
+                        d={m.ridge}
                         fill="none"
-                        stroke={m.stroke}
+                        stroke={`url(#${clipId}-${m.id}-ridge)`}
                         strokeWidth={m.selected ? 2 : 1}
                         strokeLinejoin="round"
+                        strokeLinecap="round"
                     />
-                    {m.bagged ? (
+                    {m.bagged && (
                         <>
                             <line
                                 x1={m.summit.x}
@@ -355,11 +375,6 @@ function SceneArt({ scene, clipId }: { scene: Scene; clipId: string }) {
                                 fill={C.FLAG}
                             />
                         </>
-                    ) : (
-                        <circle cx={m.summit.x} cy={m.summit.y} r={2} fill="#fff" stroke={m.stroke} />
-                    )}
-                    {m.selected && (
-                        <circle cx={m.summit.x} cy={m.summit.y} r={7} fill="none" stroke={C.INK} strokeWidth={1.5} />
                     )}
                 </g>
             ))}

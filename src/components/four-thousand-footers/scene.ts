@@ -53,8 +53,8 @@ export function toLocal(lat: number, lon: number): { e: number; n: number } {
 
 /** Vertices around a footprint. */
 const FOOT = 48;
-/** Height-grid samples per side. */
-const GRID = 33;
+/** Height-grid samples per side: fine enough to keep crags crisp. */
+const GRID = 41;
 const GRID_HALF = (GRID - 1) / 2;
 
 type Harmonic = { a: number; p: number };
@@ -96,12 +96,13 @@ function mulberry32(seed: number): () => number {
     };
 }
 
-// Profile (1 - t^p)^q: small p gives a pointed summit, large p a rounded dome;
-// q > 1 makes the flanks concave, flaring out toward the valley.
+// Profile (1 - t^p)^q. p = 1 gives a pointed summit and anything much above it
+// rounds the top into a knob, so even the domes stay close to 1; q > 1 makes
+// the flanks concave, flaring out toward the valley.
 const PROFILE: Record<"sharp" | "peak" | "dome", readonly [number, number]> = {
-    sharp: [1.05, 1.35],
-    peak: [1.35, 1.5],
-    dome: [2.1, 1.7],
+    sharp: [1, 1.45],
+    peak: [1, 1.2],
+    dome: [1.3, 1.1],
 };
 
 // Owl's Head is a long north-south ridge rather than a cone.
@@ -146,38 +147,60 @@ function buildMound(peak: Peak): Mound {
     }
 
     const [p, q] = PROFILE[peak.shape ?? "peak"];
-    const shoulders = Array.from({ length: 1 + Math.floor(rand() * 2) }, () => ({
-        t: 0.36 + rand() * 0.26,
-        alpha: rand() * TAU,
-        height: 0.07 + rand() * 0.1,
-    }));
-    const rough = { p1: rand() * TAU, p2: rand() * TAU };
+    // Craggy detail: a few rocky knobs on the flanks, and a ring of sharp-crested
+    // ridges with gullies between them, so outlines break up like real slopes.
+    const knobs = Array.from({ length: 2 + Math.floor(rand() * 3) }, () => {
+        const t = 0.22 + rand() * 0.5;
+        const alpha = rand() * TAU;
+        return { x: t * Math.cos(alpha), y: t * Math.sin(alpha), height: 0.05 + rand() * 0.08 };
+    });
+    const ridges = { count: 4 + Math.floor(rand() * 3), phase: rand() * TAU };
+    const roughPhase = rand() * TAU;
 
+    // This loop runs for every grid point of every peak, so it saves trig where
+    // it can: each harmonic's cos(k(a - p)) comes from cos(a - p) by the
+    // multiple-angle formulas, and points beyond the footprint are skipped.
+    const phaseCos = harmonics.map((h) => Math.cos(h.p));
+    const phaseSin = harmonics.map((h) => Math.sin(h.p));
     const grid = new Float64Array(GRID * GRID);
     const cellsPerKm = GRID_HALF / maxRadius;
     for (let row = 0; row < GRID; row++) {
         for (let col = 0; col < GRID; col++) {
             const ge = (col - GRID_HALF) / cellsPerKm;
             const gn = (row - GRID_HALF) / cellsPerKm;
-            const alpha = Math.atan2(gn, ge);
-            const t = Math.sqrt(ge * ge + gn * gn) / footprintRadius(outline, alpha);
+            const r = Math.sqrt(ge * ge + gn * gn);
             let h = 0;
-            if (t === 0) {
+            if (r === 0) {
                 h = 1;
-            } else if (t < 1) {
-                h = (1 - t ** p) ** q;
-                const taper = 1 - t ** 4;
-                for (const s of shoulders) {
-                    const dx = t * Math.cos(alpha) - s.t * Math.cos(s.alpha);
-                    const dy = t * Math.sin(alpha) - s.t * Math.sin(s.alpha);
-                    h += s.height * Math.exp(-(dx * dx + dy * dy) / 0.06) * taper;
+            } else if (r < maxRadius) {
+                let reach = 1;
+                for (let i = 0; i < harmonics.length; i++) {
+                    const c = (ge * phaseCos[i] + gn * phaseSin[i]) / r;
+                    reach += harmonics[i].a * (i === 0 ? c : i === 1 ? 2 * c * c - 1 : c * (4 * c * c - 3));
                 }
-                h +=
-                    (0.03 * Math.sin(7 * alpha + rough.p1) +
-                        0.02 * Math.sin(13 * alpha + 5 * t + rough.p2)) *
-                    Math.sin(Math.PI * t);
-                // The summit stays the high point.
-                h = clamp(h, 0, 0.97);
+                const radius = size * reach;
+                const t = r / radius;
+                if (t < 1) {
+                    h = p === 1 ? (1 - t) ** q : (1 - t ** p) ** q;
+                    const taper = 1 - t * t * t * t;
+                    // Zero at the summit and the foot, 1 halfway down.
+                    const mid = 4 * t * (1 - t);
+                    for (const k of knobs) {
+                        const dx = ge / radius - k.x;
+                        const dy = gn / radius - k.y;
+                        const d2 = dx * dx + dy * dy;
+                        // Past this a knob adds under 0.03% of the peak's height.
+                        if (d2 < 0.06) h += k.height * Math.exp(-d2 / 0.01) * taper;
+                    }
+                    const alpha = Math.atan2(gn, ge);
+                    // 1 - |sin| has sharp crests and rounded troughs; 0.36 is its mean.
+                    const crest = 1 - Math.abs(Math.sin((ridges.count * alpha) / 2 + ridges.phase));
+                    h += 0.11 * (crest - 0.36) * mid;
+                    // Ledges that wind around the slopes break up the flanks.
+                    h += 0.025 * Math.sin(10 * t + 3 * alpha + roughPhase) * mid;
+                    // The summit stays the high point.
+                    h = clamp(h, 0, 0.97);
+                }
             }
             grid[row * GRID + col] = h;
         }
@@ -186,8 +209,22 @@ function buildMound(peak: Peak): Mound {
     return { peak, e, n, relief, size, harmonics, footE, footN, maxRadius, grid, cellsPerKm };
 }
 
-const MOUNDS: readonly Mound[] = PEAKS.map(buildMound);
-const MOUND_BY_ID: ReadonlyMap<string, Mound> = new Map(MOUNDS.map((m) => [m.peak.id, m]));
+let mounds: readonly Mound[] | null = null;
+let moundById: ReadonlyMap<string, Mound> = new Map();
+
+/** The 48 mounds, built the first time a view needs them rather than on import. */
+function allMounds(): readonly Mound[] {
+    if (!mounds) {
+        mounds = PEAKS.map(buildMound);
+        moundById = new Map(mounds.map((m) => [m.peak.id, m]));
+    }
+    return mounds;
+}
+
+function moundFor(peakId: string): Mound | undefined {
+    allMounds();
+    return moundById.get(peakId);
+}
 
 /** Height (fraction of relief) at a point km east/north of the summit. */
 function heightAt(m: Mound, e: number, n: number): number {
@@ -217,7 +254,14 @@ type Orientation = {
     lift: number;
 };
 
-type Shape = { outline: Pt[]; shade: Pt[]; summit: Pt };
+type Shape = {
+    /** Closed outline, for the fill. */
+    outline: Pt[];
+    /** Just the top edge, foot to summit to foot: the only line that gets inked. */
+    ridge: Pt[];
+    shade: Pt[];
+    summit: Pt;
+};
 
 // The light is fixed to the viewer, as in a drawing: it comes from the front
 // left, so left flanks catch it and the shadow line runs from each summit down
@@ -342,6 +386,7 @@ function shapeOf(m: Mound, o: Orientation): Shape {
 
     return {
         outline: [...top, ...bottom.slice().reverse()],
+        ridge: top,
         shade: [...top.slice(summitIndex), ...bottom.slice(footIndex).reverse(), ...split],
         summit: { x: 0, y: rise },
     };
@@ -352,12 +397,13 @@ function shapeOf(m: Mound, o: Orientation): Shape {
  * peak's own relief (0 at the ground, 1 at the summit); x is in the same units.
  */
 export function profileShape(peakId: string): Shape {
-    const m = MOUND_BY_ID.get(peakId);
+    const m = moundFor(peakId);
     if (!m) throw new Error(`Unknown peak ${peakId}`);
     const shape = shapeOf(m, { cosT: 1, sinT: 0, sinP: 0, lift: 1 });
     const unit = (p: Pt) => ({ x: p.x / m.relief, y: p.y / m.relief });
     return {
         outline: shape.outline.map(unit),
+        ridge: shape.ridge.map(unit),
         shade: shape.shade.map(unit),
         summit: unit(shape.summit),
     };
@@ -395,7 +441,7 @@ export type Camera = {
 const PAD_X = 14;
 const PAD_TOP = 46;
 const PAD_BOTTOM = 16;
-const MAX_RELIEF = Math.max(...MOUNDS.map((m) => m.relief));
+const MAX_RELIEF = (Math.max(...PEAKS.map((p) => p.elevation)) - GROUND_FT) / FT_PER_KM;
 /** Room around a focused group for the mounds' own spread. */
 const FOCUS_MARGIN = 2.4;
 
@@ -574,6 +620,8 @@ function contains(poly: Pt[], x: number, y: number): boolean {
 export type SceneMound = {
     id: string;
     outline: string;
+    /** Open path along the top edge; the base is left unlined so peaks sit in the ground. */
+    ridge: string;
     shade: string;
     fill: string;
     shadeFill: string;
@@ -638,12 +686,12 @@ function labelWidth(name: string, elevation: string): number {
     return Math.ceil(Math.max(nameW, elevW)) + 4;
 }
 
-function toPath(points: Pt[]): string {
+export function toPath(points: Pt[], closed = true): string {
     let d = "";
     for (let i = 0; i < points.length; i++) {
         d += `${i === 0 ? "M" : "L"}${Math.round(points[i].x * 10) / 10} ${Math.round(points[i].y * 10) / 10}`;
     }
-    return `${d}Z`;
+    return closed ? `${d}Z` : d;
 }
 
 export function buildScene(input: SceneInput): Scene {
@@ -692,7 +740,8 @@ export function buildScene(input: SceneInput): Scene {
     // Mounds, far to near.
     const near = -view.radius;
     const span = 2 * view.radius;
-    const placed = MOUNDS.map((m) => ({ m, base: project(cam, m.e, m.n) }))
+    const placed = allMounds()
+        .map((m) => ({ m, base: project(cam, m.e, m.n) }))
         .filter(({ m, base }) => {
             const reach = m.maxRadius * s;
             const rise = m.relief * lift * s;
@@ -722,6 +771,7 @@ export function buildScene(input: SceneInput): Scene {
         mounds.push({
             id: m.peak.id,
             outline: toPath(outline),
+            ridge: toPath(shape.ridge.map(toScreen), false),
             shade: toPath(shape.shade.map(toScreen)),
             fill: mix(lit, SKY, fade),
             shadeFill: mix(shade, SKY, fade),
@@ -735,7 +785,7 @@ export function buildScene(input: SceneInput): Scene {
 
     // Peak labels: the selected peak first, then the focused range, then by height.
     const byId = new Map(mounds.map((m) => [m.id, m]));
-    const elevation = (id: string) => MOUND_BY_ID.get(id)?.peak.elevation ?? 0;
+    const elevation = (id: string) => moundFor(id)?.peak.elevation ?? 0;
     const order = mounds
         .map((m) => m.id)
         .sort((a, b) => {
@@ -747,7 +797,7 @@ export function buildScene(input: SceneInput): Scene {
         });
     const texts = new Map(
         order.map((id) => {
-            const peak = MOUND_BY_ID.get(id)!.peak;
+            const peak = moundFor(id)!.peak;
             return [id, { name: peak.label.toUpperCase(), elevation: `${formatFeet(peak.elevation)}′` }];
         })
     );
