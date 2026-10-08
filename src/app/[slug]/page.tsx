@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { BlackjackTrainer } from "@/components/blackjack-trainer/BlackjackTrainer";
 import { BillSplitter } from "@/components/bill-splitter/BillSplitter";
 import { RestaurantVotingApp } from "@/components/pileated-woodpecker-election/RestaurantVotingApp";
@@ -18,7 +18,12 @@ export default async function BirdAppPage({
   const isBlackjack = slug === "eastern_bluebird" || slug === "eastern_blue_bird";
   const isElection = slug === "pileated_woodpecker" || slug === "pileated-woodpecker";
   const isNeckStretch = slug === "mute_swan" || slug === "mute-swan";
-  const isFourThousandFooters = slug === "common_raven" || slug === "common-raven";
+  const isFourThousandFooters = slug === "dark_eyed_junco" || slug === "dark-eyed-junco";
+
+  // The 4000-footer log first launched under the raven; keep those links working.
+  if (slug === "common_raven" || slug === "common-raven") {
+    redirect("/dark_eyed_junco");
+  }
 
   if (isBillSplitter) {
     return (
