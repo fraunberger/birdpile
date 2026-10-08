@@ -3,7 +3,7 @@ import { BlackjackTrainer } from "@/components/blackjack-trainer/BlackjackTraine
 import { BillSplitter } from "@/components/bill-splitter/BillSplitter";
 import { RestaurantVotingApp } from "@/components/pileated-woodpecker-election/RestaurantVotingApp";
 import { NeckStretch } from "@/components/neck-stretch/NeckStretch";
-import { FourThousandFooters } from "@/components/four-thousand-footers/FourThousandFooters";
+import { JuncoHandoff } from "@/components/dark-eyed-junco/JuncoHandoff";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -76,7 +76,7 @@ export default async function BirdAppPage({
             <Image src="/logo.png" alt="Apps" fill className="object-contain" />
           </div>
         </Link>
-        <FourThousandFooters />
+        <JuncoHandoff />
       </div>
     );
   }
