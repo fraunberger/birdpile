@@ -1,16 +1,12 @@
 // Layout for the progress charts, kept as plain data like the range scene.
 
 import { PEAKS } from "./peaks";
-import { profileShape, type Pt } from "./scene";
+import { profileShape, toPath, type Pt } from "./scene";
 import type { TimelinePoint } from "./stats";
 
 export type Margin = { top: number; right: number; bottom: number; left: number };
 
 const DAY_MS = 86_400_000;
-
-function toPath(points: Pt[]): string {
-    return `${points.map((p, i) => `${i === 0 ? "M" : "L"}${Math.round(p.x * 10) / 10} ${Math.round(p.y * 10) / 10}`).join("")}Z`;
-}
 
 // --- The 48 by height ---
 
@@ -23,6 +19,7 @@ export type SkylineMountain = {
     id: string;
     label: string;
     outline: string;
+    ridge: string;
     shade: string;
     summit: Pt;
     /** Center of the mountain's slot, where its name hangs. */
@@ -68,6 +65,7 @@ export function skylineLayout(width: number): Skyline {
             id: peak.id,
             label: peak.label,
             outline: toPath(shape.outline.map(place)),
+            ridge: toPath(shape.ridge.map(place), false),
             shade: toPath(shape.shade.map(place)),
             summit: place(shape.summit),
             x: cx,

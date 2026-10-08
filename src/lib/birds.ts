@@ -105,8 +105,8 @@ export const APP_CATALOG = [
     title: "Neck Stretch",
   },
   {
-    slug: "common_raven",
-    filename: "common_raven.jpeg",
+    slug: "dark_eyed_junco",
+    filename: "dark_eyed_junco.jpeg",
     title: "4000 Footers",
   },
 ] as const;
