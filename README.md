@@ -12,6 +12,7 @@ BirdFinds is a Next.js App Router project that uses bird slugs as routes for a s
   - Blackjack trainer
   - Restaurant voting/election flow
   - Neck stretch timer (`/mute_swan`)
+  - NH 4000-footer log (`/common_raven`): range map, checklist and progress views
   - Social prototype
   - Bird log views
 
