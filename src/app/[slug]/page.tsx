@@ -3,6 +3,7 @@ import { BlackjackTrainer } from "@/components/blackjack-trainer/BlackjackTraine
 import { BillSplitter } from "@/components/bill-splitter/BillSplitter";
 import { RestaurantVotingApp } from "@/components/pileated-woodpecker-election/RestaurantVotingApp";
 import { NeckStretch } from "@/components/neck-stretch/NeckStretch";
+import { FourThousandFooters } from "@/components/four-thousand-footers/FourThousandFooters";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -17,6 +18,7 @@ export default async function BirdAppPage({
   const isBlackjack = slug === "eastern_bluebird" || slug === "eastern_blue_bird";
   const isElection = slug === "pileated_woodpecker" || slug === "pileated-woodpecker";
   const isNeckStretch = slug === "mute_swan" || slug === "mute-swan";
+  const isFourThousandFooters = slug === "common_raven" || slug === "common-raven";
 
   if (isBillSplitter) {
     return (
@@ -56,6 +58,20 @@ export default async function BirdAppPage({
           </div>
         </Link>
         <NeckStretch />
+      </div>
+    );
+  }
+
+  if (isFourThousandFooters) {
+    return (
+      <div className="min-h-screen bg-white font-mono text-black p-4">
+        <Link href="/" className="inline-flex items-center gap-2 mb-4 hover:opacity-70 transition-opacity group">
+          <span className="text-xl group-hover:-translate-x-1 transition-transform">&larr;</span>
+          <div className="relative w-12 h-8">
+            <Image src="/logo.png" alt="Apps" fill className="object-contain" />
+          </div>
+        </Link>
+        <FourThousandFooters />
       </div>
     );
   }
