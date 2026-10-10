@@ -107,7 +107,7 @@ export const APP_CATALOG = [
   {
     slug: "northern_mockingbird",
     filename: "northern_mockingbird.jpeg",
-    title: "Prizmiker",
+    title: "Prizmichael",
   },
 ] as const;
 

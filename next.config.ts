@@ -8,11 +8,11 @@ const nextConfig: NextConfig = {
     imageSizes: [64, 128, 256],
     minimumCacheTTL: 2678400,
   },
-  // Prizmiker is a static export in public/prizmiker; serve its page at
-  // /prizmiker (before the [slug] bird route can claim the path)
+  // Prizmichael is a static export in public/prizmichael; serve its page at
+  // /prizmichael (before the [slug] bird route can claim the path)
   async rewrites() {
     return {
-      beforeFiles: [{ source: "/prizmiker", destination: "/prizmiker/index.html" }],
+      beforeFiles: [{ source: "/prizmichael", destination: "/prizmichael/index.html" }],
       afterFiles: [],
       fallback: [],
     };

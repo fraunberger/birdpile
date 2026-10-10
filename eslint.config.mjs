@@ -12,8 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Prizmiker's static export (built in the prizmiker repo)
-    "public/prizmiker/**",
+    // Prizmichael's static export (built in the prizmichael repo)
+    "public/prizmichael/**",
   ]),
 ]);
 
