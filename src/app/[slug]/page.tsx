@@ -4,6 +4,7 @@ import { BillSplitter } from "@/components/bill-splitter/BillSplitter";
 import { RestaurantVotingApp } from "@/components/pileated-woodpecker-election/RestaurantVotingApp";
 import { NeckStretch } from "@/components/neck-stretch/NeckStretch";
 import { JuncoHandoff } from "@/components/dark-eyed-junco/JuncoHandoff";
+import { PrizmichaelFrame } from "@/components/prizmichael/PrizmichaelFrame";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -19,6 +20,7 @@ export default async function BirdAppPage({
   const isElection = slug === "pileated_woodpecker" || slug === "pileated-woodpecker";
   const isNeckStretch = slug === "mute_swan" || slug === "mute-swan";
   const isFourThousandFooters = slug === "dark_eyed_junco" || slug === "dark-eyed-junco";
+  const isPrizmichael = slug === "northern_mockingbird" || slug === "northern-mockingbird";
 
   // The 4000-footer log first launched under the raven; keep those links working.
   if (slug === "common_raven" || slug === "common-raven") {
