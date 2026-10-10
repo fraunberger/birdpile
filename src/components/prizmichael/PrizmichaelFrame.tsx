@@ -3,11 +3,14 @@
 import Image from "next/image";
 import Link from "next/link";
 
+// Prizmichael is its own Vercel project, deployed from the prizmichael repo on
+// every push to main, so the bird always shows the latest version
+const PRIZMICHAEL_URL = "https://prizmichael.vercel.app";
+
 /**
- * Prizmichael, the Messina-style vocal harmonizer, runs as its own static app
- * under /prizmichael (exported from the prizmichael repo with
- * `npm run export:birdpile`). This shows it full-screen below the usual way
- * back, and gives it keyboard focus so the chord keys work straight away.
+ * Prizmichael, the Messina-style vocal harmonizer, full-screen below the usual
+ * way back. It gets keyboard focus on load so the chord keys work straight
+ * away, and MIDI so a keyboard can play it.
  */
 export function PrizmichaelFrame() {
   return (
@@ -21,7 +24,7 @@ export function PrizmichaelFrame() {
         </Link>
       </div>
       <iframe
-        src="/prizmichael"
+        src={PRIZMICHAEL_URL}
         title="Prizmichael"
         allow="midi; autoplay; fullscreen"
         className="flex-1 w-full border-0"

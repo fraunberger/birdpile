@@ -12,10 +12,10 @@ BirdFinds is a Next.js App Router project that uses bird slugs as routes for a s
   - Blackjack trainer
   - Restaurant voting/election flow
   - Neck stretch timer (`/mute_swan`)
-  - Prizmichael, a Messina-style vocal harmonizer (`/northern_mockingbird`). It's a
-    static export of the [prizmichael](https://github.com/fraunberger/prizmichael)
-    repo in `public/prizmichael`; to update it, run `npm run export:birdpile` there
-    and commit the result here
+  - Prizmichael, a Messina-style vocal harmonizer (`/northern_mockingbird`). It
+    shows https://prizmichael.vercel.app, which Vercel deploys from the
+    [prizmichael](https://github.com/fraunberger/prizmichael) repo on every push,
+    so updating the app there updates the bird
   - Social prototype
   - Bird log views
 
