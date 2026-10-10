@@ -3,6 +3,7 @@ import { BlackjackTrainer } from "@/components/blackjack-trainer/BlackjackTraine
 import { BillSplitter } from "@/components/bill-splitter/BillSplitter";
 import { RestaurantVotingApp } from "@/components/pileated-woodpecker-election/RestaurantVotingApp";
 import { NeckStretch } from "@/components/neck-stretch/NeckStretch";
+import { PrizmikerFrame } from "@/components/prizmiker/PrizmikerFrame";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -17,6 +18,7 @@ export default async function BirdAppPage({
   const isBlackjack = slug === "eastern_bluebird" || slug === "eastern_blue_bird";
   const isElection = slug === "pileated_woodpecker" || slug === "pileated-woodpecker";
   const isNeckStretch = slug === "mute_swan" || slug === "mute-swan";
+  const isPrizmiker = slug === "northern_mockingbird" || slug === "northern-mockingbird";
 
   if (isBillSplitter) {
     return (
@@ -62,6 +64,10 @@ export default async function BirdAppPage({
 
   if (isElection) {
     return <RestaurantVotingApp />;
+  }
+
+  if (isPrizmiker) {
+    return <PrizmikerFrame />;
   }
 
   notFound();

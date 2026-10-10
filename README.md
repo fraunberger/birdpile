@@ -12,6 +12,10 @@ BirdFinds is a Next.js App Router project that uses bird slugs as routes for a s
   - Blackjack trainer
   - Restaurant voting/election flow
   - Neck stretch timer (`/mute_swan`)
+  - Prizmiker, a Messina-style vocal harmonizer (`/northern_mockingbird`). It's a
+    static export of the [prizmiker](https://github.com/fraunberger/prizmichael)
+    repo in `public/prizmiker`; to update it, run `npm run export:birdpile` there
+    and commit the result here
   - Social prototype
   - Bird log views
 
