@@ -85,5 +85,9 @@ export default async function BirdAppPage({
     return <RestaurantVotingApp />;
   }
 
+  if (isPrizmichael) {
+    return <PrizmichaelFrame />;
+  }
+
   notFound();
 }
