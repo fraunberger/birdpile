@@ -1,7 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import type { Album } from "@/lib/hundred-albums/albums";
 import type { AlbumMedia } from "@/lib/hundred-albums/itunes";
-import { albumKey } from "@/lib/hundred-albums/list";
+import { albumKey, ownFile } from "@/lib/hundred-albums/list";
 
 /**
  * Covers and previews for the albums on screen, shared by everything that
@@ -93,7 +93,7 @@ function request(album: Album) {
   const saved = readStorage()[key];
   if (saved) {
     entries.set(key, { status: "ready", media: saved.media });
-  } else if (album.cover && album.preview) {
+  } else if (album.cover && album.audio) {
     entries.set(key, {
       status: "ready",
       media: { cover: null, thumb: null, preview: null, previewTitle: null, appleUrl: null },
@@ -117,7 +117,7 @@ export type MediaState = {
 
 /**
  * The album's cover and preview, looked up once `load` is true. A `cover` or
- * `preview` set on the album itself wins over Apple's.
+ * `audio` file set on the album itself wins over Apple's.
  */
 export function useAlbumMedia(album: Album | null, load = true): MediaState {
   const key = album ? albumKey(album) : "";
@@ -132,12 +132,14 @@ export function useAlbumMedia(album: Album | null, load = true): MediaState {
   }, [album, load]);
 
   const media = entry?.status === "ready" ? entry.media : null;
+  const cover = ownFile(album?.cover);
+  const audio = ownFile(album?.audio);
   return {
-    status: album?.cover && album.preview ? "ready" : (entry?.status ?? "idle"),
-    cover: album?.cover ?? media?.cover ?? null,
-    thumb: album?.cover ?? media?.thumb ?? null,
-    preview: album?.preview ?? media?.preview ?? null,
-    previewTitle: album?.preview ? album.song : (media?.previewTitle ?? null),
+    status: cover && audio ? "ready" : (entry?.status ?? "idle"),
+    cover: cover ?? media?.cover ?? null,
+    thumb: cover ?? media?.thumb ?? null,
+    preview: audio ?? media?.preview ?? null,
+    previewTitle: audio ? (album?.song ?? null) : (media?.previewTitle ?? null),
     appleUrl: media?.appleUrl ?? null,
   };
 }

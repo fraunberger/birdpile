@@ -81,17 +81,17 @@ function TopBar({
   onOpenIndex: () => void;
   onHome: () => void;
 }) {
-  const album = current === null ? null : ALBUMS[current];
   const seen = current === null ? pageBounds(page, LAYOUT)[0] : current + 1;
   return (
     <header className={styles.bar} style={{ "--progress": seen / LAYOUT.total } as React.CSSProperties}>
       <button type="button" className={styles.barTitle} onClick={onHome}>
         {RETROSPECTIVE.title} <em>{RETROSPECTIVE.titleSecondLine}</em>
       </button>
-      <div className={styles.barNow} style={{ opacity: album ? 1 : 0 }} aria-live="polite">
-        {album && current !== null && (
+      {/* The number only: the name would give the guess away. */}
+      <div className={styles.barNow} style={{ opacity: current === null ? 0 : 1 }}>
+        {current !== null && (
           <>
-            <b>No. {albumNumber(current, LAYOUT)}</b> &nbsp;{album.artist}, <i>{album.title}</i>
+            <b>No. {albumNumber(current, LAYOUT)}</b> &nbsp;of {LAYOUT.total}
           </>
         )}
       </div>
@@ -151,7 +151,7 @@ function Opening({ onStart, onRead }: { onStart: () => void; onRead: () => void 
               Read in silence
             </button>
           </div>
-          <p className={styles.heroNote}>Each album plays a 30-second preview. Mute it any time, top right.</p>
+          <p className={styles.heroNote}>Each album plays a song as you go. Mute it any time, top right.</p>
         </div>
         <ChevronDown className={styles.cue} aria-hidden />
       </header>

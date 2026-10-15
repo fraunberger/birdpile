@@ -58,6 +58,7 @@ export function placeholderWriteup(album: Album): string {
   `;
 }
 
-export function placeholderLyric(album: Album): string {
-  return `Your favorite line from “${album.song}” goes here.`;
+/** Stand-in for a missing lyric. It doesn't name the song, which would give the album away. */
+export function placeholderLyric(): string {
+  return "Your favorite line from this album goes here, for everyone to guess from.";
 }

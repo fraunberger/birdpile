@@ -66,11 +66,17 @@ export function albumKey(album: Pick<Album, "artist" | "title" | "song">): strin
     .map((part) =>
       part
         .normalize("NFKD")
-        .replace(/[̀-ͯ]/g, "")
+        .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
-        .replace(/['’]/g, "")
+        .replace(/['\u2019]/g, "")
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, ""),
     )
     .join("~");
+}
+
+/** An album's own `cover` or `audio`: "blackbird.mp3" is a file in public/albums/, a path or URL is used as is. */
+export function ownFile(name: string | undefined): string | null {
+  if (!name) return null;
+  return /^(https?:|data:|blob:|\/)/.test(name) ? name : `/albums/${encodeURIComponent(name)}`;
 }

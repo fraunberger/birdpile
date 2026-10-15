@@ -5,11 +5,11 @@
  * its top reached the top of the screen. The phases below are all written in
  * those screens, so retiming the piece means changing numbers here only:
  *
- *   -1 … 0       the cover rises into place
- *   -0.35 … -0.05 the lyric fades in over it as it settles
- *    0.7 … 0.95   the lyric fades out
- *    0.85 … 1.35  the cover blurs into the background
- *    1.3 …        the write-up scrolls up over the blur (see .runway)
+ *   -1 … 0        the blurred cover rises into place
+ *   -0.35 … -0.05 the lyric fades in over it: guess the album
+ *    0.75 … 0.95  the lyric fades out
+ *    0.8 … 1.25   the cover comes into focus and its name appears
+ *    1.5 …        the write-up scrolls up over it in a frosted box (.runway)
  *
  * Jumping to an album lands at 0, with the lyric showing.
  */
@@ -225,6 +225,11 @@
   background: #161616;
 }
 
+/* Blurred, like every cover before its reveal. */
+.mosaic img {
+  filter: blur(10px) saturate(1.2);
+}
+
 @media (max-width: 720px) {
   .mosaic {
     grid-template-columns: repeat(4, 1fr);
@@ -433,10 +438,9 @@
 .album {
   --s: -1;
   --enter: clamp(0, (var(--s) + 0.35) / 0.3, 1);
-  --leave: clamp(0, (var(--s) - 0.7) / 0.25, 1);
+  --leave: clamp(0, (var(--s) - 0.75) / 0.2, 1);
   --lyric: calc(var(--enter) * (1 - var(--leave)));
-  --blur: clamp(0, (var(--s) - 0.85) / 0.5, 1);
-  --read: clamp(0, (var(--s) - 1.3) / 0.6, 1);
+  --reveal: clamp(0, (var(--s) - 0.8) / 0.45, 1);
 
   position: relative;
 }
@@ -450,6 +454,7 @@
   background: var(--paper);
 }
 
+/* The cover blown up and blurred behind everything, brighter while guessing. */
 .ambient {
   position: absolute;
   inset: -8%;
@@ -458,8 +463,7 @@
   height: 116%;
   object-fit: cover;
   filter: blur(56px) saturate(1.35);
-  opacity: calc(0.5 + 0.5 * var(--blur));
-  transition: visibility 0s;
+  opacity: calc(0.8 - 0.4 * var(--reveal));
 }
 
 .ambient:not([data-loaded]) {
@@ -470,7 +474,7 @@
   position: absolute;
   inset: 0;
   background: #0a0a0a;
-  opacity: calc(0.5 - 0.06 * var(--blur) + 0.24 * var(--read));
+  opacity: 0.45;
 }
 
 .figure {
@@ -480,23 +484,28 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1.4rem;
-  padding: 3.5rem 0 1rem;
+  gap: 1.1rem;
   margin: 0;
+  padding: 3.5rem 0 1rem;
 }
 
-.cover {
+.coverFrame {
   position: relative;
-  width: min(86vw, 62vh, 640px);
-  width: min(86vw, 62svh, 640px);
+  width: min(90vw, 72vh, 760px);
+  width: min(90vw, 72svh, 760px);
   aspect-ratio: 1;
   container-type: size;
+}
+
+/* Blurred past recognizing until the reveal, then sharp. */
+.cover {
+  position: absolute;
+  inset: 0;
   background: #1a1a1a;
   box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.75);
-  opacity: calc(1 - var(--blur));
-  filter: blur(calc(var(--blur) * 26px));
-  transform: scale(calc(1 + var(--blur) * 0.14));
-  will-change: opacity, filter, transform;
+  filter: blur(calc((1 - var(--reveal)) * 4.5vmin));
+  transform: scale(calc(1.04 - 0.04 * var(--reveal)));
+  will-change: filter, transform;
 }
 
 .coverImg {
@@ -513,7 +522,7 @@
   opacity: 1;
 }
 
-/* What shows until the art arrives, or if Apple has none. */
+/* What shows until the art arrives, or if there is none. */
 .coverStandIn {
   position: absolute;
   inset: 0;
@@ -521,7 +530,7 @@
   flex-direction: column;
   justify-content: flex-end;
   padding: 8cqw;
-  background: linear-gradient(150deg, #262626, #121212);
+  background: linear-gradient(150deg, #2a2a2a, #121212);
   text-align: left;
 }
 
@@ -541,7 +550,7 @@
 .lyricShade {
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.5));
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.32) 75%);
   opacity: var(--lyric);
 }
 
@@ -550,6 +559,7 @@
   inset: 0;
   display: flex;
   flex-direction: column;
+  align-items: center;
   justify-content: center;
   margin: 0;
   padding: 9cqw;
@@ -558,41 +568,59 @@
   transform: translateY(calc((1 - var(--enter)) * 4cqh));
 }
 
-.lyric p {
-  margin: 0;
-  font: italic 400 max(7cqw, 1.05rem) / 1.18 var(--serif);
-  letter-spacing: -0.01em;
-  white-space: pre-line;
-  text-wrap: balance;
-  text-shadow: 0 2px 30px rgba(0, 0, 0, 0.55);
-}
-
-.lyricShort p {
-  font-size: 8.6cqw;
-  line-height: 1.1;
-}
-
-.lyricLong p {
-  font-size: max(5.4cqw, 0.95rem);
-  line-height: 1.28;
-}
-
-.lyric cite {
-  margin-top: 5cqw;
-  font: normal 600 max(2.9cqw, 0.62rem) / 1.3 var(--sans);
-  letter-spacing: 0.16em;
+.lyricRank {
+  margin-bottom: 5cqw;
+  font: 600 max(2.6cqw, 0.62rem) / 1 var(--sans);
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: rgba(244, 241, 234, 0.8);
 }
 
+.lyric p {
+  margin: 0;
+  font: italic 400 max(6.2cqw, 1.05rem) / 1.18 var(--serif);
+  letter-spacing: -0.01em;
+  white-space: pre-line;
+  text-wrap: balance;
+  text-shadow: 0 2px 30px rgba(0, 0, 0, 0.6);
+}
+
+.lyricShort p {
+  font-size: max(7.6cqw, 1.2rem);
+  line-height: 1.1;
+}
+
+.lyricLong p {
+  font-size: max(4.8cqw, 0.95rem);
+  line-height: 1.28;
+}
+
+.guess {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  margin-top: 5.5cqw;
+  font: 600 max(2.3cqw, 0.6rem) / 1 var(--sans);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(244, 241, 234, 0.6);
+}
+
+.guess svg {
+  width: 1.3em;
+  height: 1.3em;
+}
+
+/* Who it was, once the cover is sharp. */
 .caption {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.35rem;
-  max-width: 86vw;
+  max-width: 90vw;
   text-align: center;
-  opacity: calc(1 - var(--leave));
+  opacity: var(--reveal);
+  transform: translateY(calc((1 - var(--reveal)) * 10px));
 }
 
 .captionRank {
@@ -610,7 +638,7 @@
   font-style: italic;
 }
 
-/* Scroll room: how long the cover and lyric hold before the write-up. */
+/* Scroll room: how long the lyric and the reveal hold before the write-up. */
 .flow {
   position: relative;
   margin-top: -100vh;
@@ -618,27 +646,37 @@
 }
 
 .runway {
-  height: 230vh;
-  height: 230svh;
+  height: 250vh;
+  height: 250svh;
 }
 
 .writeup {
   position: relative;
-  max-width: 41rem;
+  max-width: 42rem;
   margin: 0 auto;
-  padding: 0 1.25rem 40vh;
-  padding-bottom: 40svh;
-  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.35);
+  padding: 0 1rem 50vh;
+  padding-bottom: 50svh;
+}
+
+/* The write-up, on frosted glass over the cover. */
+.box {
+  padding: clamp(1.75rem, 4vw, 3rem) clamp(1.25rem, 4vw, 3rem);
+  border: 1px solid rgba(244, 241, 234, 0.14);
+  border-radius: 1.25rem;
+  background: rgba(14, 14, 14, 0.6);
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  box-shadow: 0 40px 100px -40px rgba(0, 0, 0, 0.8);
 }
 
 .writeupHead {
-  margin-bottom: 2.75rem;
+  margin-bottom: 2.25rem;
   text-align: center;
 }
 
 .writeupTitle {
   margin: 1rem 0 0.8rem;
-  font: 400 clamp(2.5rem, 6vw, 4.5rem) / 1 var(--serif);
+  font: 400 clamp(2.25rem, 5.5vw, 4rem) / 1 var(--serif);
   letter-spacing: -0.02em;
   text-wrap: balance;
 }
@@ -658,7 +696,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 1.25rem;
-  margin-top: 2.5rem;
+  margin-top: 2rem;
   padding-top: 1.25rem;
   border-top: 1px solid var(--rule);
   font: 500 0.82rem/1.4 var(--sans);
@@ -689,12 +727,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cover {
-    filter: none;
-    transform: none;
-  }
-
-  .lyric {
+  .cover,
+  .lyric,
+  .caption {
     transform: none;
   }
 
@@ -756,6 +791,10 @@
 
 .stack > :first-child {
   margin-left: 0;
+}
+
+.stack img {
+  filter: blur(5px);
 }
 
 .nextGo {

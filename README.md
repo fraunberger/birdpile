@@ -17,10 +17,12 @@ BirdFinds is a Next.js App Router project that uses bird slugs as routes for a s
     [prizmichael](https://github.com/fraunberger/prizmichael) repo on every push,
     so updating the app there updates the bird
   - The 100 Albums of My Life (`/song_sparrow`), a scrolling countdown of
-    albums: each cover shows a lyric, then blurs behind a write-up while a
-    30-second preview of a song plays. The albums, lyrics and write-ups all
-    live in `src/lib/hundred-albums/albums.ts`; covers and previews are looked
-    up on Apple Music by `/api/albums/media` and cached for a month. It's
+    albums played as a guessing game: a lyric over the blurred cover, then the
+    cover comes into focus with its name and the write-up scrolls over it in a
+    frosted box, while a song from the album plays. The albums, lyrics and
+    write-ups all live in `src/lib/hundred-albums/albums.ts`. Covers and
+    30-second previews are looked up on Apple Music by `/api/albums/media`;
+    your own mp3s and cover images go in `public/albums/` instead. It's
     unlisted: not on the home grid and not indexed by search engines
   - Social prototype
   - Bird log views

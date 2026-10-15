@@ -5,6 +5,7 @@ import {
     albumKey,
     albumNumber,
     hashFor,
+    ownFile,
     pageBounds,
     pageCount,
     pageLabel,
@@ -66,6 +67,15 @@ test('album keys ignore case, accents and punctuation', () => {
         albumKey({ artist: 'Beyoncé', title: "Lemonade", song: "Don't Hurt Yourself" }),
         'beyonce~lemonade~dont-hurt-yourself',
     );
+});
+
+test('own files are looked for in public/albums unless given a path or URL', () => {
+    assert.equal(ownFile('blackbird.mp3'), '/albums/blackbird.mp3');
+    assert.equal(ownFile('Here Comes The Sun.mp3'), '/albums/Here%20Comes%20The%20Sun.mp3');
+    assert.equal(ownFile('/music/a.mp3'), '/music/a.mp3');
+    assert.equal(ownFile('https://example.com/a.jpg'), 'https://example.com/a.jpg');
+    assert.equal(ownFile(undefined), null);
+    assert.equal(ownFile(''), null);
 });
 
 // ---- write-ups --------------------------------------------------------------

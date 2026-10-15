@@ -1,14 +1,21 @@
 /**
  * The 100 Albums of My Life: everything the page says lives in this file.
  *
+ * Each album is a little guessing game. Its lyric shows over the cover,
+ * blurred past recognizing; scrolling brings the cover into focus with its
+ * name, then the write-up.
+ *
  * List the albums in the order they should appear. With `countDown` on, the
  * first album in the list gets the highest number and the last one is No. 1.
  *
  * For each album you only need the artist, title, year and the song that
- * plays while it is on screen. The cover art and the 30-second preview of
- * that song are looked up on Apple Music, so spell them the way Apple does.
- * If the lookup picks the wrong thing, set `cover` and/or `preview` to a URL
- * of your own and the lookup is skipped for that part.
+ * plays while it is on screen. The cover art and a 30-second preview of that
+ * song are looked up on Apple Music, so spell them the way Apple does.
+ *
+ * Your own files: put them in public/albums/ and name them on the album, e.g.
+ * `audio: "blackbird.mp3"` or `cover: "white-album.jpg"`. They're used
+ * instead of Apple's, and with both set nothing is looked up. Full URLs work
+ * too.
  *
  * Write-ups: a blank line starts a new paragraph. *italics*, **bold** and
  * [links](https://example.com) work. Line breaks inside a paragraph don't
@@ -19,24 +26,22 @@ export type Album = {
   artist: string;
   title: string;
   year: number;
-  /** The song whose preview plays while the album is on screen. */
+  /** The song that plays while the album is on screen. */
   song: string;
-  /** A line from the album, shown over the cover. */
+  /** A line from the album, shown over the blurred cover for guessing. */
   lyric?: string;
-  /** Who sings the lyric or which song it's from, if not `song`. */
-  lyricSource?: string;
   writeup?: string;
-  /** Cover art URL, used instead of Apple's. */
+  /** Your own cover image: a file in public/albums/ ("abbey-road.jpg") or a URL. */
   cover?: string;
-  /** Audio URL, used instead of Apple's preview of `song`. */
-  preview?: string;
+  /** Your own song file: a file in public/albums/ ("blackbird.mp3") or a URL. */
+  audio?: string;
 };
 
 export const RETROSPECTIVE = {
   title: "The 100 Albums",
   titleSecondLine: "of My Life",
   kicker: "A personal retrospective",
-  dek: "The records that raised me, wrecked me and kept me company, one at a time. Scroll slowly; each one plays as you go.",
+  dek: "The records that raised me, wrecked me and kept me company. Each one starts as a lyric over a blurred cover: guess it, then scroll to see if you were right.",
   byline: "By Michael Fraunberger",
   dateline: "October 2026",
   /** Shown under the title before the first album. Leave empty to skip it. */

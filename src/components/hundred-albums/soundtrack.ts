@@ -100,7 +100,9 @@ export class Soundtrack {
   }
 
   /** The track for what's on screen now, or null for silence. */
-  play(src: string | null) {
+  play(track: string | null) {
+    // Compare full addresses: audio.src reports "/albums/x.mp3" as one.
+    const src = track && new URL(track, window.location.href).href;
     if (src === this.track) return;
     this.track = src;
     const audio = this.audio;
