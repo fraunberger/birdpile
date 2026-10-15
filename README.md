@@ -16,6 +16,12 @@ BirdFinds is a Next.js App Router project that uses bird slugs as routes for a s
     shows https://prizmichael.vercel.app, which Vercel deploys from the
     [prizmichael](https://github.com/fraunberger/prizmichael) repo on every push,
     so updating the app there updates the bird
+  - The 100 Albums of My Life (`/song_sparrow`), a scrolling countdown of
+    albums: each cover shows a lyric, then blurs behind a write-up while a
+    30-second preview of a song plays. The albums, lyrics and write-ups all
+    live in `src/lib/hundred-albums/albums.ts`; covers and previews are looked
+    up on Apple Music by `/api/albums/media` and cached for a month. It's
+    unlisted: not on the home grid and not indexed by search engines
   - Social prototype
   - Bird log views
 
@@ -104,6 +110,7 @@ Run these SQL files in Supabase SQL Editor:
 - `npm run build` - Production build
 - `npm run start` - Run production build
 - `npm run lint` - Run ESLint
+- `npm test` - Run the election and 100 Albums unit tests
 - `npm run test:highlight` - Run highlight parser + segmentation unit tests
 - `npm run clerk:csv-to-sql -- <csv-path>` - Convert Clerk CSV export to SQL `INSERT` rows for user migration
 

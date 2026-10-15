@@ -5,8 +5,31 @@ import { RestaurantVotingApp } from "@/components/pileated-woodpecker-election/R
 import { NeckStretch } from "@/components/neck-stretch/NeckStretch";
 import { JuncoHandoff } from "@/components/dark-eyed-junco/JuncoHandoff";
 import { PrizmichaelFrame } from "@/components/prizmichael/PrizmichaelFrame";
+import { HundredAlbums } from "@/components/hundred-albums/HundredAlbums";
+import { RETROSPECTIVE } from "@/lib/hundred-albums/albums";
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+
+const isHundredAlbumsSlug = (slug: string) => slug === "song_sparrow" || slug === "song-sparrow";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  if (!isHundredAlbumsSlug(slug)) return {};
+  // What a shared link's preview shows. The page is for the people who get
+  // the link, so it's kept off the home grid and out of search engines.
+  const title = `${RETROSPECTIVE.title} ${RETROSPECTIVE.titleSecondLine}`;
+  return {
+    title,
+    description: RETROSPECTIVE.dek,
+    openGraph: { title, description: RETROSPECTIVE.dek, type: "article" },
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function BirdAppPage({
   params,
@@ -21,6 +44,7 @@ export default async function BirdAppPage({
   const isNeckStretch = slug === "mute_swan" || slug === "mute-swan";
   const isFourThousandFooters = slug === "dark_eyed_junco" || slug === "dark-eyed-junco";
   const isPrizmichael = slug === "northern_mockingbird" || slug === "northern-mockingbird";
+  const isHundredAlbums = isHundredAlbumsSlug(slug);
 
   // The 4000-footer log first launched under the raven; keep those links working.
   if (slug === "common_raven" || slug === "common-raven") {
@@ -89,6 +113,10 @@ export default async function BirdAppPage({
 
   if (isPrizmichael) {
     return <PrizmichaelFrame />;
+  }
+
+  if (isHundredAlbums) {
+    return <HundredAlbums />;
   }
 
   notFound();
