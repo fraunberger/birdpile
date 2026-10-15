@@ -277,11 +277,12 @@ export function HundredAlbums() {
       pending.current = { target: parseHash(window.location.hash, LAYOUT), smooth: false };
       setNavigations((count) => count + 1);
     };
+    // popstate covers Back, Forward and typed fragments. The hashchange that
+    // follows comes after the address has been kept in step with the page,
+    // so it would read the wrong hash.
     window.addEventListener("popstate", onHistory);
-    window.addEventListener("hashchange", onHistory);
     return () => {
       window.removeEventListener("popstate", onHistory);
-      window.removeEventListener("hashchange", onHistory);
       window.history.scrollRestoration = "auto";
     };
   }, []);
@@ -290,6 +291,9 @@ export function HundredAlbums() {
     const next = pending.current;
     if (!next || targetPage(next.target, LAYOUT) !== page) return;
     pending.current = null;
+    // Otherwise the button that brought the reader here keeps focus, and the
+    // space bar would press it again instead of scrolling.
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     const section = next.target.kind === "album" ? document.getElementById(`no-${albumNumber(next.target.index, LAYOUT)}`) : null;
     const top = section ? section.getBoundingClientRect().top + window.scrollY : 0;
     window.scrollTo({ top, behavior: next.smooth ? "smooth" : "instant" });
@@ -389,7 +393,7 @@ export function HundredAlbums() {
         <PartEnd page={page} onGo={goTo} />
       </main>
       {indexOpen && (
-        <AlbumIndex layout={LAYOUT} current={current} page={page} onGo={goTo} onClose={closeIndex} />
+        <AlbumIndex layout={LAYOUT} page={page} onGo={goTo} onClose={closeIndex} />
       )}
     </div>
   );

@@ -12,7 +12,7 @@ import {
     parseHash,
     type Layout,
 } from './list';
-import { parseWriteup } from './writeup';
+import { cleanLyric, parseWriteup } from './writeup';
 import {
     albumName,
     findAlbumMedia,
@@ -102,6 +102,25 @@ test('write-ups split on blank lines and join wrapped lines', () => {
 
 test('links that are not web or mail addresses stay plain text', () => {
     assert.deepEqual(parseWriteup('[click](javascript:alert(1))')[0][0], { kind: 'text', text: 'click' });
+});
+
+test('link addresses can hold parentheses, like Wikipedia album pages', () => {
+    assert.deepEqual(parseWriteup('Read [this](https://en.wikipedia.org/wiki/Help!_(album)) first.')[0], [
+        { kind: 'text', text: 'Read ' },
+        { kind: 'link', text: 'this', href: 'https://en.wikipedia.org/wiki/Help!_(album)' },
+        { kind: 'text', text: ' first.' },
+    ]);
+    assert.deepEqual(parseWriteup('[x](https://a.com/b) (aside)')[0][1], { kind: 'text', text: ' (aside)' });
+});
+
+test('lyrics lose indentation and typed quote marks but keep their line breaks', () => {
+    assert.equal(cleanLyric(`
+        Here comes the sun
+        and I say
+    `), 'Here comes the sun\nand I say');
+    assert.equal(cleanLyric('"Blackbird singing in the dead of night"'), 'Blackbird singing in the dead of night');
+    assert.equal(cleanLyric('\u201cIn my life\u201d'), 'In my life');
+    assert.equal(cleanLyric('She said "hello" to me'), 'She said "hello" to me');
 });
 
 test('an empty write-up has no paragraphs', () => {

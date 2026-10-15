@@ -51,7 +51,9 @@ export class Soundtrack {
     const from = audio.volume;
     const start = performance.now();
     const step = (now: number) => {
-      const t = Math.min(1, (now - start) / ms);
+      // A frame's timestamp can predate `start`; a negative t would push the
+      // volume out of range, which throws.
+      const t = Math.min(1, Math.max(0, (now - start) / ms));
       audio.volume = from + (to - from) * t;
       if (t < 1) this.fadeFrame = requestAnimationFrame(step);
       else then?.();

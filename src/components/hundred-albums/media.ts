@@ -61,11 +61,11 @@ function remember(key: string, media: AlbumMedia) {
 async function lookUp(album: Album): Promise<AlbumMedia> {
   const params = new URLSearchParams({ artist: album.artist, album: album.title, song: album.song });
   for (let attempt = 0; ; attempt++) {
-    const response = await fetch(`/api/albums/media?${params}`);
-    if (response.ok) return (await response.json()) as AlbumMedia;
-    if (attempt >= RETRIES || response.status === 400) throw new Error(`Lookup failed: ${response.status}`);
-    // Apple limits how often it may be asked; give it a moment.
-    await new Promise((resolve) => setTimeout(resolve, 4000 * (attempt + 1)));
+    const response = await fetch(`/api/albums/media?${params}`).catch(() => null);
+    if (response?.ok) return (await response.json()) as AlbumMedia;
+    if (attempt >= RETRIES || response?.status === 400) throw new Error(`Lookup failed: ${response?.status}`);
+    // Apple allows about 20 lookups a minute; wait out the window.
+    await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 20_000 : 60_000));
   }
 }
 
@@ -76,7 +76,8 @@ function pump() {
     lookUp(album)
       .then((media) => {
         entries.set(key, { status: "ready", media });
-        remember(key, media);
+        // Something missing may be fixed on the server soon; ask again next visit.
+        if (media.cover && media.preview) remember(key, media);
       })
       .catch(() => entries.set(key, { status: "failed" }))
       .finally(() => {

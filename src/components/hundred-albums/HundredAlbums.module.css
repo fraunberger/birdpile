@@ -227,7 +227,7 @@
 
 /* Blurred, like every cover before its reveal. */
 .mosaic img {
-  filter: blur(10px) saturate(1.2);
+  filter: blur(max(10px, 1.6vw)) saturate(1.2);
 }
 
 @media (max-width: 720px) {
@@ -457,12 +457,13 @@
 /* The cover blown up and blurred behind everything, brighter while guessing. */
 .ambient {
   position: absolute;
-  inset: -8%;
-  width: 116%;
+  inset: -12%;
+  width: 124%;
   max-width: none;
-  height: 116%;
+  height: 124%;
   object-fit: cover;
-  filter: blur(56px) saturate(1.35);
+  /* Scaled with the screen, so big cover type stays unreadable on wide ones. */
+  filter: blur(max(56px, 7.5vmax)) saturate(1.35);
   opacity: calc(0.8 - 0.4 * var(--reveal));
 }
 
@@ -794,7 +795,7 @@
 }
 
 .stack img {
-  filter: blur(5px);
+  filter: blur(10px);
 }
 
 .nextGo {
@@ -1050,15 +1051,6 @@
 .entry:hover .entryTitle {
   text-decoration: underline;
   text-underline-offset: 0.18em;
-}
-
-.entry[aria-current="true"] .entryNumber {
-  color: var(--ink);
-}
-
-.entry[aria-current="true"] .entryMeta::after {
-  content: " \00b7  Now showing";
-  color: var(--ink);
 }
 
 /* A cover that fades in when it has loaded. */

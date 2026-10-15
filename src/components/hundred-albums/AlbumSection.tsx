@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef } from "react";
 import { ArrowDown, ArrowUpRight } from "lucide-react";
 import type { Album } from "@/lib/hundred-albums/albums";
 import { songName } from "@/lib/hundred-albums/itunes";
-import { parseWriteup, placeholderLyric, placeholderWriteup, type Inline } from "@/lib/hundred-albums/writeup";
+import { cleanLyric, parseWriteup, placeholderLyric, placeholderWriteup, type Inline } from "@/lib/hundred-albums/writeup";
 import { FadeImage } from "./Artwork";
 import { useAlbumMedia } from "./media";
 import { trackScroll } from "./scroll";
@@ -59,7 +59,7 @@ export function AlbumSection({
     if (ref.current) return trackScroll(ref.current);
   }, []);
 
-  const lyric = album.lyric ?? placeholderLyric();
+  const lyric = cleanLyric(album.lyric ?? placeholderLyric());
   const lyricSize = lyric.length < 50 ? styles.lyricShort : lyric.length > 120 ? styles.lyricLong : "";
   const paragraphs = parseWriteup(album.writeup ?? placeholderWriteup(album));
   // Say so when the song wasn't found and another from the album plays instead.

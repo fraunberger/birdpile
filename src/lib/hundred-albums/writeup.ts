@@ -4,7 +4,9 @@ export type Inline =
   | { kind: "text" | "em" | "strong"; text: string }
   | { kind: "link"; text: string; href: string };
 
-const INLINE = /\*\*([^*]+)\*\*|\*([^*]+)\*|\[([^\]]+)\]\(([^)\s]+)\)/g;
+// Link addresses may hold one level of parentheses, as Wikipedia's
+// "Help!_(album)" pages do.
+const INLINE = /\*\*([^*]+)\*\*|\*([^*]+)\*|\[([^\]]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)/g;
 
 function parseInline(text: string): Inline[] {
   const out: Inline[] = [];
@@ -56,6 +58,20 @@ export function placeholderWriteup(album: Album): string {
     and why this record sits exactly here on the list. **A sentence or two of
     conviction** goes a long way.
   `;
+}
+
+/**
+ * A lyric as written in albums.ts, ready to show: indentation from a
+ * multi-line string dropped, line breaks kept, and any quote marks the author
+ * typed around it removed (the page adds its own).
+ */
+export function cleanLyric(lyric: string): string {
+  return lyric
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join("\n")
+    .replace(/^["\u201c]+|["\u201d]+$/g, "");
 }
 
 /** Stand-in for a missing lyric. It doesn't name the song, which would give the album away. */
