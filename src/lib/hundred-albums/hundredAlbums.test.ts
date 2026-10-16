@@ -2,14 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+    albumAnchor,
     albumKey,
     albumNumber,
-    hashFor,
+    jumpRanges,
     ownFile,
-    pageBounds,
-    pageCount,
-    pageLabel,
-    parseHash,
+    youtubeVideo,
     type Layout,
 } from './list';
 import { cleanLyric, parseWriteup } from './writeup';
@@ -23,7 +21,7 @@ import {
     type ItunesItem,
 } from './itunes';
 
-const LAYOUT: Layout = { total: 27, pageSize: 10, countDown: true };
+const LAYOUT: Layout = { total: 27, countDown: true, jumpSize: 20 };
 
 // ---- the list ---------------------------------------------------------------
 
@@ -31,30 +29,42 @@ test('counts down from the length of the list to No. 1', () => {
     assert.equal(albumNumber(0, LAYOUT), 27);
     assert.equal(albumNumber(26, LAYOUT), 1);
     assert.equal(albumNumber(0, { ...LAYOUT, countDown: false }), 1);
+    assert.equal(albumAnchor(0, LAYOUT), 'no-27');
 });
 
-test('splits the list into parts, the last one short', () => {
-    assert.equal(pageCount(LAYOUT), 3);
-    assert.deepEqual(pageBounds(2, LAYOUT), [20, 27]);
-    assert.equal(pageLabel(0, LAYOUT), 'Nos. 27–18');
-    assert.equal(pageLabel(2, LAYOUT), 'Nos. 7–1');
+test('jump links go 1–20, 21–40, …, each to the first of its range down the page', () => {
+    const hundred: Layout = { total: 100, countDown: true, jumpSize: 20 };
+    assert.deepEqual(
+        jumpRanges(hundred).map((r) => [r.label, albumNumber(r.index, hundred)]),
+        [['1–20', 20], ['21–40', 40], ['41–60', 60], ['61–80', 80], ['81–100', 100]],
+    );
+    // Counting up, each range starts at its smallest number instead.
+    const up: Layout = { ...hundred, countDown: false };
+    assert.deepEqual(jumpRanges(up).map((r) => albumNumber(r.index, up)), [1, 21, 41, 61, 81]);
+    // A short last range, and a range of one.
+    assert.deepEqual(jumpRanges(LAYOUT).map((r) => r.label), ['1–20', '21–27']);
+    assert.deepEqual(jumpRanges({ total: 21, countDown: true, jumpSize: 20 }).map((r) => r.label), ['1–20', '21']);
 });
 
-test('links to albums and parts survive a round trip through the address', () => {
-    for (const target of [
-        { kind: 'album', index: 0 },
-        { kind: 'album', index: 26 },
-        { kind: 'part', page: 1 },
-        { kind: 'part', page: 0 },
-    ] as const) {
-        assert.deepEqual(parseHash(hashFor(target, LAYOUT), LAYOUT), target);
+test('YouTube links are understood however they were copied', () => {
+    const id = 'dQw4w9WgXcQ';
+    for (const link of [
+        id,
+        `https://www.youtube.com/watch?v=${id}`,
+        `https://youtube.com/watch?v=${id}&list=PL123&index=2`,
+        `https://youtu.be/${id}?si=abc123`,
+        `youtu.be/${id}`,
+        `https://music.youtube.com/watch?v=${id}&feature=share`,
+        `https://m.youtube.com/watch?v=${id}`,
+        `https://www.youtube.com/embed/${id}`,
+        `https://www.youtube.com/shorts/${id}`,
+    ]) {
+        assert.deepEqual(youtubeVideo(link), { id, start: 0 }, link);
     }
-    assert.equal(hashFor({ kind: 'album', index: 0 }, LAYOUT), '#no-27');
-});
-
-test('a link to an album or part that does not exist goes to the top', () => {
-    for (const hash of ['#no-0', '#no-28', '#part-4', '#part-0', '#whatever', '']) {
-        assert.deepEqual(parseHash(hash, LAYOUT), { kind: 'part', page: 0 });
+    assert.deepEqual(youtubeVideo(`https://youtu.be/${id}?t=90`), { id, start: 90 });
+    assert.deepEqual(youtubeVideo(`https://www.youtube.com/watch?v=${id}&t=1m30s`), { id, start: 90 });
+    for (const link of [undefined, '', 'https://vimeo.com/123', 'https://www.youtube.com/watch?v=short', 'not a link']) {
+        assert.equal(youtubeVideo(link), null, String(link));
     }
 });
 
@@ -165,6 +175,8 @@ test('song names drop release notes but keep real brackets', () => {
     assert.equal(songName("Holdin' On"), 'holdin on');
     assert.equal(albumName('The Beatles (White Album) [Remastered]'), 'the beatles');
     assert.equal(albumName('Jewel - Single'), 'jewel');
+    assert.equal(albumName('Flume: Deluxe Edition'), 'flume');
+    assert.equal(albumName('Sgt. Pepper: The Movie'), 'sgt pepper the movie');
 });
 
 test('artist credits match with or without "The" and with guests', () => {

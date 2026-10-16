@@ -396,43 +396,6 @@
   font-weight: 600;
 }
 
-/* ---- Part openers (pages after the first) ------------------------------- */
-
-.partHead {
-  display: grid;
-  place-items: center;
-  min-height: 80vh;
-  min-height: 80svh;
-  padding: 6rem 1.25rem 4rem;
-  text-align: center;
-}
-
-.partTitle {
-  margin: 1.2rem 0 1.6rem;
-  font: 300 clamp(3rem, 10vw, 7.5rem) / 0.95 var(--serif);
-  letter-spacing: -0.03em;
-}
-
-.textButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font: 600 0.8rem/1 var(--sans);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.textButton:hover {
-  color: var(--ink);
-}
-
-.textButton svg {
-  width: 1rem;
-  height: 1rem;
-}
-
 /* ---- One album ---------------------------------------------------------- */
 
 .album {
@@ -741,7 +704,66 @@
   }
 }
 
-/* ---- End of a part ------------------------------------------------------ */
+/* ---- Jump links (on the opening and in the index) ----------------------- */
+
+.jumps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 2rem;
+}
+
+.jumps .kicker {
+  margin-right: 0.25rem;
+}
+
+.chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 2.1rem;
+  padding: 0 0.9rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  color: var(--muted);
+  font: 600 0.78rem/1 var(--sans);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.chip:hover {
+  border-color: var(--faint);
+  color: var(--ink);
+}
+
+/* ---- The full song (YouTube, in the write-up) ----------------------------- */
+
+.fullSong {
+  margin-top: 2rem;
+}
+
+.video {
+  position: relative;
+  margin-top: 0.75rem;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background: #000;
+}
+
+.video iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* ---- End of the list ------------------------------------------------------ */
 
 .pageEnd {
   position: relative;
@@ -750,114 +772,15 @@
   text-align: center;
 }
 
-.nextCard {
-  display: block;
-  width: 100%;
-  max-width: 40rem;
-  margin: 0 auto;
-  padding: 2.5rem 1.5rem 2.25rem;
-  border: 1px solid var(--rule);
-  border-radius: 1.25rem;
-  color: var(--ink);
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
-}
-
-.nextCard:hover {
-  border-color: var(--faint);
-  background: rgba(244, 241, 234, 0.03);
-}
-
-.nextTitle {
-  display: block;
-  margin: 1rem 0 1.75rem;
-  font: 300 clamp(2.5rem, 7vw, 4.5rem) / 1 var(--serif);
-  letter-spacing: -0.025em;
-}
-
-.stack {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 1.75rem;
-}
-
-.stack > * {
-  width: clamp(3.5rem, 12vw, 5.5rem);
-  aspect-ratio: 1;
-  margin-left: -0.9rem;
-  background: #1c1c1c;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-}
-
-.stack > :first-child {
-  margin-left: 0;
-}
-
-.stack img {
-  filter: blur(10px);
-}
-
-.nextGo {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font: 600 0.9rem/1 var(--sans);
-}
-
-.nextGo svg {
-  width: 1.1rem;
-  height: 1.1rem;
-  transition: transform 0.2s;
-}
-
-.nextCard:hover .nextGo svg {
-  transform: translateX(3px);
-}
-
 .fin {
   max-width: 40rem;
   margin: 0 auto;
 }
 
-.fin .nextTitle {
-  font-style: italic;
-}
-
-.pager {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.5rem;
-  margin-top: 3.5rem;
-}
-
-.pagerLabel {
-  width: 100%;
-  margin-bottom: 0.5rem;
-}
-
-.pagerButton {
-  min-width: 2.6rem;
-  height: 2.6rem;
-  padding: 0 0.6rem;
-  border: 1px solid var(--rule);
-  border-radius: 999px;
-  color: var(--ink);
-  font: 600 0.85rem/1 var(--sans);
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-  transition: border-color 0.2s;
-}
-
-.pagerButton:hover {
-  border-color: var(--faint);
-}
-
-.pagerButton[aria-current="page"] {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: #111;
+.finTitle {
+  margin: 1rem 0 1.75rem;
+  font: italic 300 clamp(2.5rem, 7vw, 4.5rem) / 1 var(--serif);
+  letter-spacing: -0.025em;
 }
 
 .home {
@@ -894,7 +817,7 @@
 }
 
 .indexInner {
-  max-width: 72rem;
+  max-width: 44rem;
   margin: 0 auto;
   padding: 0 1.25rem 6rem;
 }
@@ -904,7 +827,7 @@
   top: 0;
   z-index: 1;
   padding: 1rem 0 0.75rem;
-  background: linear-gradient(rgba(10, 10, 10, 1) 80%, rgba(10, 10, 10, 0));
+  background: linear-gradient(rgba(10, 10, 10, 1) 85%, rgba(10, 10, 10, 0));
 }
 
 .indexTop {
@@ -926,79 +849,23 @@
 
 .chips {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 1rem;
   padding-bottom: 0.5rem;
-  overflow-x: auto;
-  scrollbar-width: none;
 }
 
-.chip {
-  flex: none;
-  height: 2.1rem;
-  padding: 0 0.9rem;
-  border: 1px solid var(--rule);
-  border-radius: 999px;
-  color: var(--muted);
-  font: 600 0.75rem/1 var(--sans);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.chip:hover {
-  border-color: var(--faint);
-  color: var(--ink);
-}
-
-.chip[aria-current="true"] {
-  border-color: var(--ink);
-  color: var(--ink);
-}
-
-.group {
-  margin-top: 2.25rem;
-  scroll-margin-top: 8.5rem;
-}
-
-.groupHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  padding-bottom: 0.65rem;
-  border-bottom: 1px solid var(--ink);
-}
-
-.groupTitle {
-  margin: 0;
-  font: 400 1.5rem/1.1 var(--serif);
-}
-
-.groupTitle span {
-  margin-right: 0.6rem;
-  font: 600 0.72rem/1 var(--sans);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--muted);
-  vertical-align: 0.25em;
-}
-
-/* Two columns read down, like a printed list. */
+/* One list, in page order. */
 .entries {
-  margin: 0;
+  margin: 1rem 0 0;
   padding: 0;
   list-style: none;
+  border-top: 1px solid var(--rule);
 }
 
+/* Clears the sticky header, even when its shortcuts wrap to two rows. */
 .entries > li {
-  break-inside: avoid;
-}
-
-@media (min-width: 760px) {
-  .entries {
-    columns: 2;
-    column-gap: 2.5rem;
-  }
+  scroll-margin-top: 11rem;
 }
 
 .entry {
@@ -1011,7 +878,6 @@
   border-bottom: 1px solid var(--rule);
   color: var(--ink);
   text-align: left;
-  cursor: pointer;
 }
 
 .entryNumber {

@@ -1,9 +1,6 @@
 import type { Album } from "./albums";
 
-/** Where the page can send someone: the top of a part, or one album. */
-export type Target = { kind: "part"; page: number } | { kind: "album"; index: number };
-
-export type Layout = { total: number; pageSize: number; countDown: boolean };
+export type Layout = { total: number; countDown: boolean; jumpSize: number };
 
 /** The number printed next to the album at `index` in the list. */
 export function albumNumber(index: number, layout: Layout): number {
@@ -14,50 +11,30 @@ export function indexOfNumber(number: number, layout: Layout): number {
   return layout.countDown ? layout.total - number : number - 1;
 }
 
-export function pageCount(layout: Layout): number {
-  return Math.max(1, Math.ceil(layout.total / layout.pageSize));
-}
+export type JumpRange = { label: string; first: number; last: number; index: number };
 
-export function pageOf(index: number, layout: Layout): number {
-  return Math.floor(index / layout.pageSize);
-}
-
-/** List indexes `[start, end)` on a page. */
-export function pageBounds(page: number, layout: Layout): [number, number] {
-  const start = page * layout.pageSize;
-  return [start, Math.min(start + layout.pageSize, layout.total)];
-}
-
-/** "Nos. 100–91", the way the page names a part. */
-export function pageLabel(page: number, layout: Layout): string {
-  const [start, end] = pageBounds(page, layout);
-  const first = albumNumber(start, layout);
-  const last = albumNumber(end - 1, layout);
-  return first === last ? `No. ${first}` : `Nos. ${first}–${last}`;
-}
-
-/** `#no-87` is album No. 87, `#part-3` the top of part 3, anything else the top of the page. */
-export function parseHash(hash: string, layout: Layout): Target {
-  const album = /^#no-(\d+)$/.exec(hash);
-  if (album) {
-    const index = indexOfNumber(Number(album[1]), layout);
-    if (index >= 0 && index < layout.total) return { kind: "album", index };
+/**
+ * Shortcuts into the list: 1–20, 21–40 and so on, smallest numbers first.
+ * Each goes to the album of its range that comes first while scrolling, which
+ * on a countdown is its highest number (1–20 starts at No. 20).
+ */
+export function jumpRanges(layout: Layout): JumpRange[] {
+  const ranges: JumpRange[] = [];
+  for (let first = 1; first <= layout.total; first += layout.jumpSize) {
+    const last = Math.min(first + layout.jumpSize - 1, layout.total);
+    ranges.push({
+      label: first === last ? `${first}` : `${first}\u2013${last}`,
+      first,
+      last,
+      index: indexOfNumber(layout.countDown ? last : first, layout),
+    });
   }
-  const part = /^#part-(\d+)$/.exec(hash);
-  if (part) {
-    const page = Number(part[1]) - 1;
-    if (page >= 0 && page < pageCount(layout)) return { kind: "part", page };
-  }
-  return { kind: "part", page: 0 };
+  return ranges;
 }
 
-export function hashFor(target: Target, layout: Layout): string {
-  if (target.kind === "album") return `#no-${albumNumber(target.index, layout)}`;
-  return target.page === 0 ? "" : `#part-${target.page + 1}`;
-}
-
-export function targetPage(target: Target, layout: Layout): number {
-  return target.kind === "album" ? pageOf(target.index, layout) : target.page;
+/** The id of an album's section, and the #fragment that links to it: "no-87". */
+export function albumAnchor(index: number, layout: Layout): string {
+  return `no-${albumNumber(index, layout)}`;
 }
 
 /** A stable id for an album, used for caching its cover and preview. */
@@ -79,4 +56,38 @@ export function albumKey(album: Pick<Album, "artist" | "title" | "song">): strin
 export function ownFile(name: string | undefined): string | null {
   if (!name) return null;
   return /^(https?:|data:|blob:|\/)/.test(name) ? name : `/albums/${encodeURIComponent(name)}`;
+}
+
+export type YouTubeVideo = { id: string; start: number };
+
+function seconds(value: string | null): number {
+  if (!value) return 0;
+  if (/^\d+$/.test(value)) return Number(value);
+  const parts = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/.exec(value);
+  return parts ? Number(parts[1] ?? 0) * 3600 + Number(parts[2] ?? 0) * 60 + Number(parts[3] ?? 0) : 0;
+}
+
+/**
+ * The video in a YouTube link, as pasted from the share button or the
+ * address bar (youtube.com/watch?v=…, youtu.be/…, music.youtube.com, /embed/,
+ * /shorts/), or a bare video id. A ?t= start time is kept.
+ */
+export function youtubeVideo(link: string | undefined): YouTubeVideo | null {
+  const value = link?.trim();
+  if (!value) return null;
+  if (/^[\w-]{11}$/.test(value)) return { id: value, start: 0 };
+  let url: URL;
+  try {
+    url = new URL(/^https?:/.test(value) ? value : `https://${value}`);
+  } catch {
+    return null;
+  }
+  const host = url.hostname.replace(/^(www|m|music)\./, "");
+  let id: string | null = null;
+  if (host === "youtu.be") id = url.pathname.slice(1).split("/")[0];
+  else if (host === "youtube.com" || host === "youtube-nocookie.com") {
+    id = url.searchParams.get("v") ?? /^\/(?:embed|shorts|live|v)\/([\w-]+)/.exec(url.pathname)?.[1] ?? null;
+  }
+  if (!id || !/^[\w-]{11}$/.test(id)) return null;
+  return { id, start: seconds(url.searchParams.get("t") ?? url.searchParams.get("start")) };
 }

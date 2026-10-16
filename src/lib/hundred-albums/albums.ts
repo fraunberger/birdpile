@@ -17,6 +17,10 @@
  * instead of Apple's, and with both set nothing is looked up. Full URLs work
  * too.
  *
+ * The full song: paste a YouTube link as `youtube`. It sits in the write-up,
+ * ready to play, and picks up when the 30-second preview ends. (Phones only
+ * let a video start from a tap on it, so there it waits for one.)
+ *
  * Write-ups: a blank line starts a new paragraph. *italics*, **bold** and
  * [links](https://example.com) work. Line breaks inside a paragraph don't
  * matter, so wrap the text however you like.
@@ -35,6 +39,8 @@ export type Album = {
   cover?: string;
   /** Your own song file: a file in public/albums/ ("blackbird.mp3") or a URL. */
   audio?: string;
+  /** A YouTube link to the full song, played after the preview. */
+  youtube?: string;
 };
 
 export const RETROSPECTIVE = {
@@ -53,8 +59,8 @@ export const RETROSPECTIVE = {
   `,
   /** Number from the top of the list down to No. 1. */
   countDown: true,
-  /** Albums per part. Each part is its own page. */
-  pageSize: 10,
+  /** The shortcuts at the top go 1–20, 21–40 and so on. */
+  jumpSize: 20,
 };
 
 export const ALBUMS: Album[] = [

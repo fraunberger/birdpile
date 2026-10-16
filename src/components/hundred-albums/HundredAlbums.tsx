@@ -1,60 +1,49 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, ChevronDown, List, Play, VolumeX } from "lucide-react";
+import { ChevronDown, List, Play, VolumeX } from "lucide-react";
 import { ALBUMS, RETROSPECTIVE, type Album } from "@/lib/hundred-albums/albums";
-import {
-  albumKey,
-  albumNumber,
-  hashFor,
-  pageBounds,
-  pageCount,
-  pageLabel,
-  pageOf,
-  parseHash,
-  targetPage,
-  type Layout,
-  type Target,
-} from "@/lib/hundred-albums/list";
+import { albumAnchor, albumKey, albumNumber, jumpRanges, youtubeVideo, type Layout } from "@/lib/hundred-albums/list";
 import { parseWriteup } from "@/lib/hundred-albums/writeup";
 import { AlbumIndex } from "./AlbumIndex";
 import { AlbumSection, Equalizer, Runs } from "./AlbumSection";
-import { FadeImage, useNear } from "./Artwork";
+import { FadeImage, useInView } from "./Artwork";
 import { serif, sans } from "./fonts";
 import { useAlbumMedia } from "./media";
 import { Soundtrack } from "./soundtrack";
+import { onVideoPlaying, pauseVideos, playVideo } from "./youtube";
 import styles from "./HundredAlbums.module.css";
 
 const LAYOUT: Layout = {
   total: ALBUMS.length,
-  pageSize: RETROSPECTIVE.pageSize,
   countDown: RETROSPECTIVE.countDown,
+  jumpSize: RETROSPECTIVE.jumpSize,
 };
 
 const soundtrack = new Soundtrack();
 
-// The address's #fragment says which part is showing (#part-3), or which
-// album (#no-87). It changes as the reader scrolls, so links can be shared.
-const hashListeners = new Set<() => void>();
+// The opening's background, blurred: the first few albums, repeated.
+const MOSAIC = Array.from({ length: 36 }, (_, i) => ALBUMS[i % Math.min(6, ALBUMS.length)]);
 
-function subscribeHash(listener: () => void) {
-  hashListeners.add(listener);
-  window.addEventListener("popstate", listener);
-  window.addEventListener("hashchange", listener);
-  return () => {
-    hashListeners.delete(listener);
-    window.removeEventListener("popstate", listener);
-    window.removeEventListener("hashchange", listener);
-  };
+function scrollToAlbum(index: number, behavior: ScrollBehavior) {
+  document.getElementById(albumAnchor(index, LAYOUT))?.scrollIntoView({ behavior });
 }
 
-function writeHash(hash: string, mode: "push" | "replace") {
-  if (hash === window.location.hash) return;
-  const url = `${window.location.pathname}${window.location.search}${hash}`;
-  if (mode === "push") window.history.pushState(null, "", url);
-  else window.history.replaceState(null, "", url);
-  for (const listener of hashListeners) listener();
+/**
+ * Takes focus off the button just clicked. Left on it, the space bar would
+ * press it again (and scroll back) instead of paging down.
+ */
+function release() {
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+}
+
+/** Keeps the address on the album showing (#no-87), so it can be shared or reloaded. */
+function showInAddress(index: number | null) {
+  const hash = index === null ? "" : `#${albumAnchor(index, LAYOUT)}`;
+  if (hash !== window.location.hash) {
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${hash}`);
+  }
 }
 
 function Tile({ album, load }: { album: Album; load: boolean }) {
@@ -66,25 +55,43 @@ function Tile({ album, load }: { album: Album; load: boolean }) {
   );
 }
 
+/** 1–20, 21–40 and so on: plain links to each range's first album on the page. */
+function JumpLinks() {
+  if (LAYOUT.total <= LAYOUT.jumpSize) return null;
+  return (
+    <nav className={styles.jumps} aria-label="Jump to">
+      <span className={styles.kicker}>Jump to</span>
+      {jumpRanges(LAYOUT).map((range) => (
+        <a key={range.first} href={`#${albumAnchor(range.index, LAYOUT)}`} className={styles.chip}>
+          {range.label}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
 function TopBar({
   current,
-  page,
   muted,
   onToggleSound,
   onOpenIndex,
-  onHome,
 }: {
   current: number | null;
-  page: number;
   muted: boolean;
   onToggleSound: () => void;
   onOpenIndex: () => void;
-  onHome: () => void;
 }) {
-  const seen = current === null ? pageBounds(page, LAYOUT)[0] : current + 1;
+  const seen = current === null ? 0 : current + 1;
   return (
     <header className={styles.bar} style={{ "--progress": seen / LAYOUT.total } as React.CSSProperties}>
-      <button type="button" className={styles.barTitle} onClick={onHome}>
+      <button
+        type="button"
+        className={styles.barTitle}
+        onClick={() => {
+          release();
+          window.scrollTo({ top: 0 });
+        }}
+      >
         {RETROSPECTIVE.title} <em>{RETROSPECTIVE.titleSecondLine}</em>
       </button>
       {/* The number only: the name would give the guess away. */}
@@ -121,16 +128,16 @@ function TopBar({
 }
 
 function Opening({ onStart, onRead }: { onStart: () => void; onRead: () => void }) {
-  const [start, end] = pageBounds(0, LAYOUT);
-  const firstPart = ALBUMS.slice(start, end);
-  const tiles = Array.from({ length: 36 }, (_, i) => firstPart[i % firstPart.length]);
   const intro = parseWriteup(RETROSPECTIVE.intro);
+  // The mosaic's covers are looked up only while the opening is showing, so a
+  // link straight to an album doesn't spend lookups on them.
+  const [heroRef, heroInView] = useInView<HTMLElement>("0px");
   return (
     <>
-      <header className={styles.hero} data-album="">
+      <header ref={heroRef} className={styles.hero} data-album="">
         <div className={styles.mosaic} aria-hidden>
-          {tiles.map((album, i) => (
-            <Tile key={i} album={album} load />
+          {MOSAIC.map((album, i) => (
+            <Tile key={i} album={album} load={heroInView} />
           ))}
         </div>
         <div className={styles.heroInner}>
@@ -151,6 +158,7 @@ function Opening({ onStart, onRead }: { onStart: () => void; onRead: () => void 
               Read in silence
             </button>
           </div>
+          <JumpLinks />
           <p className={styles.heroNote}>Each album plays a song as you go. Mute it any time, top right.</p>
         </div>
         <ChevronDown className={styles.cue} aria-hidden />
@@ -168,70 +176,23 @@ function Opening({ onStart, onRead }: { onStart: () => void; onRead: () => void 
   );
 }
 
-function PartOpening({ page, onGo }: { page: number; onGo: (target: Target) => void }) {
+function Ending() {
   return (
-    <header className={styles.partHead} data-album="">
-      <div>
-        <p className={styles.kicker}>
-          Part {page + 1} of {pageCount(LAYOUT)}
-        </p>
-        <h1 className={styles.partTitle}>{pageLabel(page, LAYOUT)}</h1>
-        <button type="button" className={styles.textButton} onClick={() => onGo({ kind: "part", page: page - 1 })}>
-          <ArrowLeft aria-hidden />
-          Back to part {page}
+    <footer className={styles.pageEnd}>
+      <div className={styles.fin}>
+        <p className={styles.kicker}>That&rsquo;s the list</p>
+        <p className={styles.finTitle}>Thanks for listening.</p>
+        <button
+          type="button"
+          className={styles.secondary}
+          onClick={() => {
+            release();
+            window.scrollTo({ top: 0 });
+          }}
+        >
+          Back to the top
         </button>
       </div>
-    </header>
-  );
-}
-
-function PartEnd({ page, onGo }: { page: number; onGo: (target: Target, smooth?: boolean) => void }) {
-  const parts = pageCount(LAYOUT);
-  const next = page + 1 < parts ? page + 1 : null;
-  const [ref, near] = useNear<HTMLElement>("600px");
-  const [start, end] = next === null ? [0, 0] : pageBounds(next, LAYOUT);
-  return (
-    <footer ref={ref} className={styles.pageEnd}>
-      {next !== null ? (
-        <button type="button" className={styles.nextCard} onClick={() => onGo({ kind: "part", page: next })}>
-          <span className={styles.kicker}>Up next &middot; Part {next + 1}</span>
-          <span className={styles.nextTitle}>{pageLabel(next, LAYOUT)}</span>
-          <span className={styles.stack} aria-hidden>
-            {ALBUMS.slice(start, Math.min(end, start + 5)).map((album, i) => (
-              <Tile key={i} album={album} load={near} />
-            ))}
-          </span>
-          <span className={styles.nextGo}>
-            Keep going
-            <ArrowRight aria-hidden />
-          </span>
-        </button>
-      ) : (
-        <div className={styles.fin}>
-          <p className={styles.kicker}>That&rsquo;s the list</p>
-          <p className={styles.nextTitle}>Thanks for listening.</p>
-          <button type="button" className={styles.secondary} onClick={() => onGo({ kind: "part", page: 0 }, page === 0)}>
-            Back to the beginning
-          </button>
-        </div>
-      )}
-      {parts > 1 && (
-        <nav className={styles.pager} aria-label="Parts">
-          <p className={`${styles.kicker} ${styles.pagerLabel}`}>All parts</p>
-          {Array.from({ length: parts }, (_, part) => (
-            <button
-              key={part}
-              type="button"
-              className={styles.pagerButton}
-              aria-current={part === page ? "page" : undefined}
-              title={pageLabel(part, LAYOUT)}
-              onClick={() => onGo({ kind: "part", page: part })}
-            >
-              {part + 1}
-            </button>
-          ))}
-        </nav>
-      )}
       <div>
         <Link href="/" className={styles.home}>
           birdpile
@@ -242,62 +203,26 @@ function PartEnd({ page, onGo }: { page: number; onGo: (target: Target, smooth?:
 }
 
 /**
- * The 100 Albums of My Life: a scrolling countdown in parts, each album's
- * cover and lyric giving way to a write-up while a preview of its song plays.
+ * The 100 Albums of My Life: one long countdown, each album a guess (its
+ * lyric over the blurred cover) that resolves into the cover and a write-up,
+ * while a preview of its song plays and then, given a YouTube link, the song.
  */
 export function HundredAlbums() {
-  const hash = useSyncExternalStore(subscribeHash, () => window.location.hash, () => "");
-  const page = targetPage(parseHash(hash, LAYOUT), LAYOUT);
-  const [active, setActive] = useState<number | null>(null);
+  const [current, setCurrent] = useState<number | null>(null);
   const [indexOpen, setIndexOpen] = useState(false);
-  const [navigations, setNavigations] = useState(0);
-  const pending = useRef<{ target: Target; smooth: boolean } | null>(null);
+  const currentRef = useRef<number | null>(null);
+  // The album whose video the reader is listening to, if any: its preview
+  // mustn't start over it when its lookup arrives late.
+  const videoAlbum = useRef<number | null>(null);
+  // Whether the middle of the screen has been seen yet: until then the
+  // address may hold a link being followed, and must be left alone.
+  const located = useRef(false);
   const mainRef = useRef<HTMLElement>(null);
   const muted = useSyncExternalStore(soundtrack.subscribe, soundtrack.isMuted, () => true);
-
-  // The album in the middle of the screen, once it's one on this part.
-  const current = active !== null && pageOf(active, LAYOUT) === page ? active : null;
-  const currentMedia = useAlbumMedia(current === null ? null : ALBUMS[current]);
-  const playing = !muted && current !== null && currentMedia.preview !== null;
-
-  const goTo = useCallback((target: Target, smooth = false) => {
-    setIndexOpen(false);
-    pending.current = { target, smooth };
-    writeHash(hashFor(target, LAYOUT), "push");
-    setNavigations((count) => count + 1);
-  }, []);
-
-  // Arriving on a link to an album or a part, or going back and forward
-  // through history, scrolls to it once its part is showing.
-  useLayoutEffect(() => {
-    window.history.scrollRestoration = "manual";
-    const target = parseHash(window.location.hash, LAYOUT);
-    if (target.kind === "album" || target.page > 0) pending.current = { target, smooth: false };
-    const onHistory = () => {
-      pending.current = { target: parseHash(window.location.hash, LAYOUT), smooth: false };
-      setNavigations((count) => count + 1);
-    };
-    // popstate covers Back, Forward and typed fragments. The hashchange that
-    // follows comes after the address has been kept in step with the page,
-    // so it would read the wrong hash.
-    window.addEventListener("popstate", onHistory);
-    return () => {
-      window.removeEventListener("popstate", onHistory);
-      window.history.scrollRestoration = "auto";
-    };
-  }, []);
-
-  useLayoutEffect(() => {
-    const next = pending.current;
-    if (!next || targetPage(next.target, LAYOUT) !== page) return;
-    pending.current = null;
-    // Otherwise the button that brought the reader here keeps focus, and the
-    // space bar would press it again instead of scrolling.
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    const section = next.target.kind === "album" ? document.getElementById(`no-${albumNumber(next.target.index, LAYOUT)}`) : null;
-    const top = section ? section.getBoundingClientRect().top + window.scrollY : 0;
-    window.scrollTo({ top, behavior: next.smooth ? "smooth" : "instant" });
-  }, [page, navigations]);
+  const finished = useSyncExternalStore(soundtrack.subscribe, soundtrack.isFinished, () => false);
+  const currentAlbum = current === null ? null : ALBUMS[current];
+  const currentMedia = useAlbumMedia(currentAlbum);
+  const playing = !muted && !finished && currentMedia.preview !== null;
 
   // Which album is in the middle of the screen.
   useEffect(() => {
@@ -308,35 +233,98 @@ export function HundredAlbums() {
         for (const record of records) {
           if (!record.isIntersecting) continue;
           const value = (record.target as HTMLElement).dataset.album;
-          setActive(value ? Number(value) : null);
+          located.current = true;
+          setCurrent(value ? Number(value) : null);
         }
       },
       { rootMargin: "-49% 0px -50% 0px" },
     );
     main.querySelectorAll("[data-album]").forEach((element) => observer.observe(element));
     return () => observer.disconnect();
-  }, [page]);
+  }, []);
 
-  // Keep the address on what's showing, so it can be shared or reloaded.
+  // Moving to another album: stop the last one's video, and once the reader
+  // settles on it, point the address at it. Settling matters: Safari and
+  // Firefox allow only so many address changes a second, and skimming the
+  // page would pass dozens of albums.
   useEffect(() => {
-    if (pending.current) return;
-    const target: Target = current === null ? { kind: "part", page } : { kind: "album", index: current };
-    writeHash(hashFor(target, LAYOUT), "replace");
-  }, [current, page]);
+    currentRef.current = current;
+    videoAlbum.current = null;
+    pauseVideos();
+    if (!located.current) return;
+    const timer = setTimeout(() => {
+      try {
+        showInAddress(current);
+      } catch {
+        // Over the browser's limit anyway: the address just stays put.
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [current]);
 
-  // The music follows the album on screen.
+  // The music follows the album on screen: its preview once, then its video.
   useEffect(() => {
+    if (current !== null && videoAlbum.current === current) return;
     soundtrack.play(current === null ? null : currentMedia.preview);
   }, [current, currentMedia.preview]);
+
+  // An album with a video but no preview: the video is its music.
+  const settled = currentMedia.status === "ready" || currentMedia.status === "failed";
+  const videoOnly = settled && currentMedia.preview === null && youtubeVideo(currentAlbum?.youtube) !== null;
+  useEffect(() => {
+    if (current !== null && videoOnly && !muted) playVideo(current);
+  }, [current, videoOnly, muted]);
+
+  useEffect(() => {
+    soundtrack.setOnEnded(() => {
+      if (currentRef.current !== null) playVideo(currentRef.current);
+    });
+    onVideoPlaying((index) => {
+      videoAlbum.current = index;
+      soundtrack.yieldToVideo();
+    });
+    return () => {
+      soundtrack.setOnEnded(null);
+      onVideoPlaying(null);
+    };
+  }, []);
+
+  // A link to an album jumps there before the fonts arrive; once they do, the
+  // write-ups above it change height a little, so jump again unless the
+  // reader has already moved.
+  useEffect(() => {
+    const target = window.location.hash ? document.getElementById(window.location.hash.slice(1)) : null;
+    if (!target) return;
+    let moved = false;
+    const stop = () => {
+      moved = true;
+    };
+    const events = ["wheel", "touchstart", "keydown", "mousedown"] as const;
+    for (const name of events) window.addEventListener(name, stop, { passive: true });
+    document.fonts?.ready.then(() => {
+      if (!moved) target.scrollIntoView();
+    });
+    return () => {
+      for (const name of events) window.removeEventListener(name, stop);
+    };
+  }, []);
+
+  const toggleSound = useCallback(() => {
+    if (soundtrack.isMuted()) {
+      soundtrack.unmute();
+      // The preview already played: carry on with the video, if there is one.
+      if (soundtrack.isFinished() && currentRef.current !== null) playVideo(currentRef.current);
+    } else {
+      soundtrack.mute();
+      pauseVideos();
+    }
+  }, []);
 
   useEffect(() => {
     const onVisibility = () => soundtrack.setHidden(document.visibilityState === "hidden");
     const onKey = (event: KeyboardEvent) => {
       const typing = event.target instanceof HTMLElement && event.target.closest("input, textarea, [contenteditable]");
-      if (event.key === "m" && !event.metaKey && !event.ctrlKey && !event.altKey && !typing) {
-        if (soundtrack.isMuted()) soundtrack.unmute();
-        else soundtrack.mute();
-      }
+      if (event.key === "m" && !event.metaKey && !event.ctrlKey && !event.altKey && !typing) toggleSound();
     };
     const root = document.documentElement;
     const background = root.style.backgroundColor;
@@ -348,53 +336,44 @@ export function HundredAlbums() {
       window.removeEventListener("keydown", onKey);
       root.style.backgroundColor = background;
       soundtrack.stop();
+      pauseVideos();
     };
-  }, []);
+  }, [toggleSound]);
 
-  const toggleSound = useCallback(() => {
-    if (soundtrack.isMuted()) soundtrack.unmute();
-    else soundtrack.mute();
-  }, []);
   const closeIndex = useCallback(() => setIndexOpen(false), []);
-  const firstAlbum: Target = { kind: "album", index: pageBounds(0, LAYOUT)[0] };
-  const [start, end] = pageBounds(page, LAYOUT);
 
   return (
     <div className={`${styles.page} ${serif.variable} ${sans.variable}`}>
       <TopBar
         current={current}
-        page={page}
         muted={muted}
         onToggleSound={toggleSound}
         onOpenIndex={() => setIndexOpen(true)}
-        onHome={() => goTo({ kind: "part", page: 0 }, page === 0)}
       />
       <main ref={mainRef}>
-        {page === 0 ? (
-          <Opening
-            onStart={() => {
-              soundtrack.unmute();
-              goTo(firstAlbum, true);
-            }}
-            onRead={() => goTo(firstAlbum, true)}
-          />
-        ) : (
-          <PartOpening page={page} onGo={goTo} />
-        )}
-        {ALBUMS.slice(start, end).map((album, i) => (
+        <Opening
+          onStart={() => {
+            soundtrack.unmute();
+            release();
+            scrollToAlbum(0, "smooth");
+          }}
+          onRead={() => {
+            release();
+            scrollToAlbum(0, "smooth");
+          }}
+        />
+        {ALBUMS.map((album, index) => (
           <AlbumSection
-            key={`${start + i}-${albumKey(album)}`}
+            key={`${index}-${albumKey(album)}`}
             album={album}
-            index={start + i}
-            number={albumNumber(start + i, LAYOUT)}
-            playing={playing && current === start + i}
+            index={index}
+            number={albumNumber(index, LAYOUT)}
+            playing={playing && current === index}
           />
         ))}
-        <PartEnd page={page} onGo={goTo} />
+        <Ending />
       </main>
-      {indexOpen && (
-        <AlbumIndex layout={LAYOUT} page={page} onGo={goTo} onClose={closeIndex} />
-      )}
+      {indexOpen && <AlbumIndex layout={LAYOUT} onClose={closeIndex} />}
     </div>
   );
 }

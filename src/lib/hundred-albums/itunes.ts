@@ -49,11 +49,16 @@ export function normalize(text: string): string {
     .trim();
 }
 
-// Words that mark a bracketed or dashed suffix as describing a release or a
-// recording rather than being part of the name: "(Remastered 2009)",
-// "- 2019 Mix", "(feat. Kai)", "[Deluxe Edition]".
+// Words that mark a bracketed, dashed or colon suffix as describing a release
+// or a recording rather than being part of the name: "(Remastered 2009)",
+// "- 2019 Mix", "(feat. Kai)", "[Deluxe Edition]", ": Deluxe Edition".
 const RELEASE_NOTE =
-  /remaster|\bmix\b|version|\bedit\b|\bmono\b|stereo|deluxe|edition|anniversary|expanded|bonus|\bfeat\b|\bft\b|\bwith\b|single/i;
+  /remaster|\bmix\b|version|\bedit\b|\bmono\b|stereo|deluxe|edition|anniversary|expanded|bonus|\bfeat\b|\bft\b|\bwith\b|single|\bep\b/i;
+
+/** Drops a trailing " - 2019 Mix" or ": Deluxe Edition" that is a release note. */
+function dropNoteSuffix(text: string): string {
+  return text.replace(/(\s+-\s+|:\s+)(.*)$/, (whole, _dash: string, rest: string) => (RELEASE_NOTE.test(rest) ? "" : whole));
+}
 
 // Recordings nobody means unless they ask for them.
 const ALTERNATE_TAKE =
@@ -61,18 +66,15 @@ const ALTERNATE_TAKE =
 
 /** A song's name without notes like "(Remastered 2009)" or "(feat. Kai)". */
 export function songName(text: string): string {
-  const cleaned = text
-    .replace(/\s*[([]([^)\]]*)[)\]]/g, (whole, inner: string) => (RELEASE_NOTE.test(inner) ? "" : whole))
-    .replace(/\s+-\s+(.*)$/, (whole, rest: string) => (RELEASE_NOTE.test(rest) ? "" : whole));
-  return normalize(cleaned);
+  const cleaned = text.replace(/\s*[([]([^)\]]*)[)\]]/g, (whole, inner: string) =>
+    RELEASE_NOTE.test(inner) ? "" : whole,
+  );
+  return normalize(dropNoteSuffix(cleaned));
 }
 
 /** An album's name without anything in brackets: "The Beatles (White Album)" is "the beatles". */
 export function albumName(text: string): string {
-  const cleaned = text
-    .replace(/\s*[([][^)\]]*[)\]]/g, "")
-    .replace(/\s+-\s+(.*)$/, (whole, rest: string) => (RELEASE_NOTE.test(rest) ? "" : whole));
-  return normalize(cleaned);
+  return normalize(dropNoteSuffix(text.replace(/\s*[([][^)\]]*[)\]]/g, "")));
 }
 
 function artistWords(text: string): string[] {

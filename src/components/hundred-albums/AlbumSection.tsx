@@ -4,10 +4,12 @@ import { Fragment, useEffect, useRef } from "react";
 import { ArrowDown, ArrowUpRight } from "lucide-react";
 import type { Album } from "@/lib/hundred-albums/albums";
 import { songName } from "@/lib/hundred-albums/itunes";
+import { youtubeVideo, type YouTubeVideo } from "@/lib/hundred-albums/list";
 import { cleanLyric, parseWriteup, placeholderLyric, placeholderWriteup, type Inline } from "@/lib/hundred-albums/writeup";
-import { FadeImage } from "./Artwork";
+import { FadeImage, useInView } from "./Artwork";
 import { useAlbumMedia } from "./media";
 import { trackScroll } from "./scroll";
+import { attachPlayer } from "./youtube";
 import styles from "./HundredAlbums.module.css";
 
 export function Runs({ runs }: { runs: Inline[] }) {
@@ -36,6 +38,38 @@ export function Equalizer({ playing }: { playing: boolean }) {
 }
 
 /**
+ * The full song on YouTube, in the write-up. The iframe exists while its
+ * album is on or near the screen (`live`), so a long list doesn't load a
+ * hundred players, yet it's ready by the time the preview ends.
+ */
+function FullSong({ video, index, live }: { video: YouTubeVideo; index: number; live: boolean }) {
+  const frameRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    if (live && frameRef.current) return attachPlayer(index, frameRef.current);
+  }, [live, index]);
+
+  const params = new URLSearchParams({ enablejsapi: "1", playsinline: "1", rel: "0" });
+  if (video.start) params.set("start", String(video.start));
+  return (
+    <div className={styles.fullSong}>
+      <p className={styles.kicker}>The full song</p>
+      <div className={styles.video}>
+        {live && (
+          <iframe
+            ref={frameRef}
+            src={`https://www.youtube.com/embed/${video.id}?${params}`}
+            title="The full song on YouTube"
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allowFullScreen
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
  * One album, as a guessing game: the lyric over the cover blurred past
  * recognizing, then the cover comes into focus with its name, and the
  * write-up scrolls up over it in a frosted box.
@@ -52,12 +86,16 @@ export function AlbumSection({
   /** Whether this album's song is the one playing. */
   playing: boolean;
 }) {
-  const ref = useRef<HTMLElement>(null);
-  const media = useAlbumMedia(album);
+  // The album counts as wanted while within a screen and a half: that's when
+  // it's looked up, so lookups keep pace with reading instead of all going to
+  // Apple at once, and when its video player exists.
+  const [ref, near] = useInView<HTMLElement>("150% 0px");
+  const media = useAlbumMedia(album, near);
+  const video = youtubeVideo(album.youtube);
 
   useEffect(() => {
     if (ref.current) return trackScroll(ref.current);
-  }, []);
+  }, [ref]);
 
   const lyric = cleanLyric(album.lyric ?? placeholderLyric());
   const lyricSize = lyric.length < 50 ? styles.lyricShort : lyric.length > 120 ? styles.lyricLong : "";
@@ -118,6 +156,7 @@ export function AlbumSection({
                 </p>
               ))}
             </div>
+            {video && <FullSong video={video} index={index} live={near} />}
             <footer className={styles.writeupFoot}>
               <span className={styles.nowPlaying}>
                 <Equalizer playing={playing} />

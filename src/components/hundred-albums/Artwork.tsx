@@ -28,23 +28,21 @@ export function FadeImage({ src, className }: { src: string | null; className?: 
   );
 }
 
-/** Whether the element has come within `margin` of the screen. Stays true after. */
-export function useNear<T extends Element>(margin = "300px") {
+/** Whether the element is within `margin` of the screen right now. */
+export function useInView<T extends Element>(margin: string) {
   const ref = useRef<T>(null);
-  const [near, setNear] = useState(false);
+  const [inView, setInView] = useState(false);
 
   useEffect(() => {
     const element = ref.current;
-    if (!element || near) return;
+    if (!element) return;
     const observer = new IntersectionObserver(
-      (records) => {
-        if (records.some((record) => record.isIntersecting)) setNear(true);
-      },
+      (records) => setInView(records[records.length - 1].isIntersecting),
       { rootMargin: margin },
     );
     observer.observe(element);
     return () => observer.disconnect();
-  }, [margin, near]);
+  }, [margin]);
 
-  return [ref, near] as const;
+  return [ref, inView] as const;
 }
