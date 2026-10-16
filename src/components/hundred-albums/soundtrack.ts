@@ -50,9 +50,12 @@ export class Soundtrack {
       const audio = new Audio();
       audio.preload = "auto";
       audio.addEventListener("ended", () => {
-        if (audio.src === SILENCE) return;
+        // Only the current track's end counts: one that runs out while fading
+        // away from a switch belongs to the album just left.
+        if (audio.src === SILENCE || audio.src !== this.track) return;
         this.finished = true;
-        this.endedListener?.();
+        this.emit();
+        if (!this.muted) this.endedListener?.();
       });
       this.audio = audio;
     }
@@ -122,9 +125,13 @@ export class Soundtrack {
     const src = track && new URL(track, window.location.href).href;
     if (src === this.track) return;
     this.track = src;
-    this.finished = false;
-    const audio = this.audio;
-    if (this.muted || this.hidden || !audio) return;
+    if (this.finished) {
+      this.finished = false;
+      this.emit();
+    }
+    if (this.muted || this.hidden) return;
+    // There may be no element yet when the sound came on from a tap on a video.
+    const audio = this.element();
     const attempt = ++this.switching;
     const next = () => {
       if (attempt !== this.switching) return;
@@ -156,10 +163,8 @@ export class Soundtrack {
     cancelAnimationFrame(this.fadeFrame);
     this.audio?.pause();
     this.finished = true;
-    if (this.muted) {
-      this.muted = false;
-      this.emit();
-    }
+    this.muted = false;
+    this.emit();
   }
 
   /** Stops for good, when the reader leaves the page. */

@@ -6,7 +6,7 @@ import type { Album } from "@/lib/hundred-albums/albums";
 import { songName } from "@/lib/hundred-albums/itunes";
 import { youtubeVideo, type YouTubeVideo } from "@/lib/hundred-albums/list";
 import { cleanLyric, parseWriteup, placeholderLyric, placeholderWriteup, type Inline } from "@/lib/hundred-albums/writeup";
-import { FadeImage, useInView, useNear } from "./Artwork";
+import { FadeImage, useInView } from "./Artwork";
 import { useAlbumMedia } from "./media";
 import { trackScroll } from "./scroll";
 import { attachPlayer } from "./youtube";
@@ -38,25 +38,24 @@ export function Equalizer({ playing }: { playing: boolean }) {
 }
 
 /**
- * The full song on YouTube, in the write-up. The iframe exists only while the
- * write-up is within a couple of screens, so a long list doesn't load a
- * hundred players, but that's soon enough to be ready when the preview ends.
+ * The full song on YouTube, in the write-up. The iframe exists while its
+ * album is on or near the screen (`live`), so a long list doesn't load a
+ * hundred players, yet it's ready by the time the preview ends.
  */
-function FullSong({ video, index }: { video: YouTubeVideo; index: number }) {
-  const [ref, inView] = useInView<HTMLDivElement>("200% 0px");
+function FullSong({ video, index, live }: { video: YouTubeVideo; index: number; live: boolean }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
-    if (inView && frameRef.current) return attachPlayer(index, frameRef.current);
-  }, [inView, index]);
+    if (live && frameRef.current) return attachPlayer(index, frameRef.current);
+  }, [live, index]);
 
   const params = new URLSearchParams({ enablejsapi: "1", playsinline: "1", rel: "0" });
   if (video.start) params.set("start", String(video.start));
   return (
     <div className={styles.fullSong}>
       <p className={styles.kicker}>The full song</p>
-      <div ref={ref} className={styles.video}>
-        {inView && (
+      <div className={styles.video}>
+        {live && (
           <iframe
             ref={frameRef}
             src={`https://www.youtube.com/embed/${video.id}?${params}`}
@@ -87,9 +86,10 @@ export function AlbumSection({
   /** Whether this album's song is the one playing. */
   playing: boolean;
 }) {
-  // Look the album up as it comes within a screen and a half, so lookups
-  // keep pace with reading instead of all going to Apple at once.
-  const [ref, near] = useNear<HTMLElement>("150% 0px");
+  // The album counts as wanted while within a screen and a half: that's when
+  // it's looked up, so lookups keep pace with reading instead of all going to
+  // Apple at once, and when its video player exists.
+  const [ref, near] = useInView<HTMLElement>("150% 0px");
   const media = useAlbumMedia(album, near);
   const video = youtubeVideo(album.youtube);
 
@@ -156,7 +156,7 @@ export function AlbumSection({
                 </p>
               ))}
             </div>
-            {video && <FullSong video={video} index={index} />}
+            {video && <FullSong video={video} index={index} live={near} />}
             <footer className={styles.writeupFoot}>
               <span className={styles.nowPlaying}>
                 <Equalizer playing={playing} />

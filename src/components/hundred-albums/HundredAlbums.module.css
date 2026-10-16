@@ -863,8 +863,9 @@
   border-top: 1px solid var(--rule);
 }
 
+/* Clears the sticky header, even when its shortcuts wrap to two rows. */
 .entries > li {
-  scroll-margin-top: 8rem;
+  scroll-margin-top: 11rem;
 }
 
 .entry {

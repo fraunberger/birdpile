@@ -4,11 +4,11 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import Link from "next/link";
 import { ChevronDown, List, Play, VolumeX } from "lucide-react";
 import { ALBUMS, RETROSPECTIVE, type Album } from "@/lib/hundred-albums/albums";
-import { albumAnchor, albumKey, albumNumber, jumpRanges, type Layout } from "@/lib/hundred-albums/list";
+import { albumAnchor, albumKey, albumNumber, jumpRanges, youtubeVideo, type Layout } from "@/lib/hundred-albums/list";
 import { parseWriteup } from "@/lib/hundred-albums/writeup";
 import { AlbumIndex } from "./AlbumIndex";
 import { AlbumSection, Equalizer, Runs } from "./AlbumSection";
-import { FadeImage } from "./Artwork";
+import { FadeImage, useInView } from "./Artwork";
 import { serif, sans } from "./fonts";
 import { useAlbumMedia } from "./media";
 import { Soundtrack } from "./soundtrack";
@@ -30,6 +30,14 @@ function scrollToAlbum(index: number, behavior: ScrollBehavior) {
   document.getElementById(albumAnchor(index, LAYOUT))?.scrollIntoView({ behavior });
 }
 
+/**
+ * Takes focus off the button just clicked. Left on it, the space bar would
+ * press it again (and scroll back) instead of paging down.
+ */
+function release() {
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+}
+
 /** Keeps the address on the album showing (#no-87), so it can be shared or reloaded. */
 function showInAddress(index: number | null) {
   const hash = index === null ? "" : `#${albumAnchor(index, LAYOUT)}`;
@@ -38,8 +46,8 @@ function showInAddress(index: number | null) {
   }
 }
 
-function Tile({ album }: { album: Album }) {
-  const media = useAlbumMedia(album);
+function Tile({ album, load }: { album: Album; load: boolean }) {
+  const media = useAlbumMedia(album, load);
   return (
     <div>
       <FadeImage src={media.thumb} className={styles.thumb} />
@@ -76,7 +84,14 @@ function TopBar({
   const seen = current === null ? 0 : current + 1;
   return (
     <header className={styles.bar} style={{ "--progress": seen / LAYOUT.total } as React.CSSProperties}>
-      <button type="button" className={styles.barTitle} onClick={() => window.scrollTo({ top: 0 })}>
+      <button
+        type="button"
+        className={styles.barTitle}
+        onClick={() => {
+          release();
+          window.scrollTo({ top: 0 });
+        }}
+      >
         {RETROSPECTIVE.title} <em>{RETROSPECTIVE.titleSecondLine}</em>
       </button>
       {/* The number only: the name would give the guess away. */}
@@ -114,12 +129,15 @@ function TopBar({
 
 function Opening({ onStart, onRead }: { onStart: () => void; onRead: () => void }) {
   const intro = parseWriteup(RETROSPECTIVE.intro);
+  // The mosaic's covers are looked up only while the opening is showing, so a
+  // link straight to an album doesn't spend lookups on them.
+  const [heroRef, heroInView] = useInView<HTMLElement>("0px");
   return (
     <>
-      <header className={styles.hero} data-album="">
+      <header ref={heroRef} className={styles.hero} data-album="">
         <div className={styles.mosaic} aria-hidden>
           {MOSAIC.map((album, i) => (
-            <Tile key={i} album={album} />
+            <Tile key={i} album={album} load={heroInView} />
           ))}
         </div>
         <div className={styles.heroInner}>
@@ -164,7 +182,14 @@ function Ending() {
       <div className={styles.fin}>
         <p className={styles.kicker}>That&rsquo;s the list</p>
         <p className={styles.finTitle}>Thanks for listening.</p>
-        <button type="button" className={styles.secondary} onClick={() => window.scrollTo({ top: 0 })}>
+        <button
+          type="button"
+          className={styles.secondary}
+          onClick={() => {
+            release();
+            window.scrollTo({ top: 0 });
+          }}
+        >
           Back to the top
         </button>
       </div>
@@ -186,13 +211,18 @@ export function HundredAlbums() {
   const [current, setCurrent] = useState<number | null>(null);
   const [indexOpen, setIndexOpen] = useState(false);
   const currentRef = useRef<number | null>(null);
+  // The album whose video the reader is listening to, if any: its preview
+  // mustn't start over it when its lookup arrives late.
+  const videoAlbum = useRef<number | null>(null);
   // Whether the middle of the screen has been seen yet: until then the
   // address may hold a link being followed, and must be left alone.
   const located = useRef(false);
   const mainRef = useRef<HTMLElement>(null);
   const muted = useSyncExternalStore(soundtrack.subscribe, soundtrack.isMuted, () => true);
-  const currentMedia = useAlbumMedia(current === null ? null : ALBUMS[current]);
-  const playing = !muted && current !== null && currentMedia.preview !== null;
+  const finished = useSyncExternalStore(soundtrack.subscribe, soundtrack.isFinished, () => false);
+  const currentAlbum = current === null ? null : ALBUMS[current];
+  const currentMedia = useAlbumMedia(currentAlbum);
+  const playing = !muted && !finished && currentMedia.preview !== null;
 
   // Which album is in the middle of the screen.
   useEffect(() => {
@@ -213,23 +243,46 @@ export function HundredAlbums() {
     return () => observer.disconnect();
   }, []);
 
-  // Moving to another album: point the address at it, stop the last one's video.
+  // Moving to another album: stop the last one's video, and once the reader
+  // settles on it, point the address at it. Settling matters: Safari and
+  // Firefox allow only so many address changes a second, and skimming the
+  // page would pass dozens of albums.
   useEffect(() => {
     currentRef.current = current;
-    if (located.current) showInAddress(current);
+    videoAlbum.current = null;
     pauseVideos();
+    if (!located.current) return;
+    const timer = setTimeout(() => {
+      try {
+        showInAddress(current);
+      } catch {
+        // Over the browser's limit anyway: the address just stays put.
+      }
+    }, 800);
+    return () => clearTimeout(timer);
   }, [current]);
 
   // The music follows the album on screen: its preview once, then its video.
   useEffect(() => {
+    if (current !== null && videoAlbum.current === current) return;
     soundtrack.play(current === null ? null : currentMedia.preview);
   }, [current, currentMedia.preview]);
+
+  // An album with a video but no preview: the video is its music.
+  const settled = currentMedia.status === "ready" || currentMedia.status === "failed";
+  const videoOnly = settled && currentMedia.preview === null && youtubeVideo(currentAlbum?.youtube) !== null;
+  useEffect(() => {
+    if (current !== null && videoOnly && !muted) playVideo(current);
+  }, [current, videoOnly, muted]);
 
   useEffect(() => {
     soundtrack.setOnEnded(() => {
       if (currentRef.current !== null) playVideo(currentRef.current);
     });
-    onVideoPlaying(() => soundtrack.yieldToVideo());
+    onVideoPlaying((index) => {
+      videoAlbum.current = index;
+      soundtrack.yieldToVideo();
+    });
     return () => {
       soundtrack.setOnEnded(null);
       onVideoPlaying(null);
@@ -301,9 +354,13 @@ export function HundredAlbums() {
         <Opening
           onStart={() => {
             soundtrack.unmute();
+            release();
             scrollToAlbum(0, "smooth");
           }}
-          onRead={() => scrollToAlbum(0, "smooth")}
+          onRead={() => {
+            release();
+            scrollToAlbum(0, "smooth");
+          }}
         />
         {ALBUMS.map((album, index) => (
           <AlbumSection

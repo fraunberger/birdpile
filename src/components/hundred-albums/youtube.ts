@@ -15,7 +15,12 @@ type Player = {
 type PlayerApi = {
   Player: new (
     element: HTMLIFrameElement,
-    options: { events: { onStateChange: (event: { data: number }) => void } },
+    options: {
+      events: {
+        onReady: (event: { target: Player }) => void;
+        onStateChange: (event: { data: number }) => void;
+      };
+    },
   ) => Player;
   PlayerState: { PLAYING: number };
 };
@@ -45,17 +50,29 @@ function loadApi(): Promise<PlayerApi> {
   return api;
 }
 
+/** Players ready to take commands, by album. */
 const players = new Map<number, Player>();
+/** An album whose video was asked to play before its player was ready. */
+let playWhenReady: number | null = null;
 let playingListener: ((index: number) => void) | null = null;
 
 /** Hooks the iframe of album `index` up to the player API. Returns the unhook. */
 export function attachPlayer(index: number, frame: HTMLIFrameElement): () => void {
-  let attached: Player | null = null;
+  let ready: Player | null = null;
   let cancelled = false;
   loadApi().then((YT) => {
     if (cancelled) return;
-    attached = new YT.Player(frame, {
+    new YT.Player(frame, {
       events: {
+        onReady: ({ target }) => {
+          if (cancelled) return;
+          ready = target;
+          players.set(index, target);
+          if (playWhenReady === index) {
+            playWhenReady = null;
+            tell(target, "playVideo");
+          }
+        },
         onStateChange: ({ data }) => {
           if (data !== YT.PlayerState.PLAYING) return;
           pauseVideos(index);
@@ -63,11 +80,10 @@ export function attachPlayer(index: number, frame: HTMLIFrameElement): () => voi
         },
       },
     });
-    players.set(index, attached);
   });
   return () => {
     cancelled = true;
-    if (attached && players.get(index) === attached) players.delete(index);
+    if (ready && players.get(index) === ready) players.delete(index);
   };
 }
 
@@ -80,13 +96,16 @@ function tell(player: Player | undefined, command: "playVideo" | "pauseVideo") {
   }
 }
 
-/** Starts album `index`'s video, if it has one ready. */
+/** Starts album `index`'s video, now or as soon as its player is ready. */
 export function playVideo(index: number) {
-  tell(players.get(index), "playVideo");
+  const player = players.get(index);
+  if (player) tell(player, "playVideo");
+  else playWhenReady = index;
 }
 
 /** Pauses every video, or every one but album `except`'s. */
 export function pauseVideos(except?: number) {
+  if (playWhenReady !== except) playWhenReady = null;
   for (const [index, player] of players) {
     if (index !== except) tell(player, "pauseVideo");
   }
