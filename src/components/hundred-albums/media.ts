@@ -5,15 +5,17 @@ import { albumKey, ownFile } from "@/lib/hundred-albums/list";
 
 /**
  * Covers and previews for the albums on screen, shared by everything that
- * shows them. Lookups go through /api/albums/media a few at a time and are
- * remembered in this browser for a week, so a second visit asks for nothing.
+ * shows them. Lookups go through /api/albums/media two at a time, only for
+ * albums coming up on screen: Apple answers about 20 lookups a minute, and a
+ * burst past that comes back empty. Answers are remembered in this browser
+ * for a week, so a second visit asks for nothing.
  */
 
 type Entry = { status: "loading" } | { status: "ready"; media: AlbumMedia } | { status: "failed" };
 
 const STORAGE_KEY = "birdpile.hundredAlbums.media.v1";
 const KEEP_MS = 7 * 24 * 60 * 60 * 1000;
-const PARALLEL = 3;
+const PARALLEL = 2;
 const RETRIES = 2;
 
 const entries = new Map<string, Entry>();
@@ -88,12 +90,15 @@ function pump() {
   }
 }
 
-function request(album: Album) {
+/** Makes the album's media available: from this browser's cache, or with a lookup if `lookUpIfMissing`. */
+function request(album: Album, lookUpIfMissing: boolean) {
   const key = albumKey(album);
   if (entries.has(key)) return;
   const saved = readStorage()[key];
   if (saved) {
     entries.set(key, { status: "ready", media: saved.media });
+  } else if (!lookUpIfMissing) {
+    return;
   } else if (album.cover && album.audio) {
     entries.set(key, {
       status: "ready",
@@ -117,8 +122,9 @@ export type MediaState = {
 };
 
 /**
- * The album's cover and preview, looked up once `load` is true. A `cover` or
- * `audio` file set on the album itself wins over Apple's.
+ * The album's cover and preview, looked up once `load` is true; until then
+ * only what this browser already has. A `cover` or `audio` file set on the
+ * album itself wins over Apple's.
  */
 export function useAlbumMedia(album: Album | null, load = true): MediaState {
   const key = album ? albumKey(album) : "";
@@ -129,7 +135,7 @@ export function useAlbumMedia(album: Album | null, load = true): MediaState {
   );
 
   useEffect(() => {
-    if (album && load) request(album);
+    if (album) request(album, load);
   }, [album, load]);
 
   const media = entry?.status === "ready" ? entry.media : null;

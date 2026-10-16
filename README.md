@@ -22,8 +22,10 @@ BirdFinds is a Next.js App Router project that uses bird slugs as routes for a s
     frosted box, while a song from the album plays. The albums, lyrics and
     write-ups all live in `src/lib/hundred-albums/albums.ts`. Covers and
     30-second previews are looked up on Apple Music by `/api/albums/media`;
-    your own mp3s and cover images go in `public/albums/` instead. It's
-    unlisted: not on the home grid and not indexed by search engines
+    your own mp3s and cover images go in `public/albums/` instead, and a
+    YouTube link per album plays the full song after the preview. It's one
+    long page with 1–20, 21–40… shortcuts at the top. It's unlisted: not on
+    the home grid and not indexed by search engines
   - Social prototype
   - Bird log views
 

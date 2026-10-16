@@ -1,6 +1,7 @@
 /**
  * The music behind the page: one audio element, faded between tracks as the
- * reader scrolls from album to album.
+ * reader scrolls from album to album. Each track plays once; when it ends,
+ * `onEnded` hears about it (the page then starts the full song on YouTube).
  *
  * Browsers only let a page start sound from a tap or click, so the reader
  * turns it on (`unmute`, called from the click itself). That first play
@@ -20,6 +21,9 @@ export class Soundtrack {
   private hidden = false;
   private fadeFrame = 0;
   private switching = 0;
+  /** The current track has played to its end, or a video took over from it. */
+  private finished = false;
+  private endedListener: (() => void) | null = null;
   private listeners = new Set<() => void>();
 
   subscribe = (listener: () => void) => {
@@ -31,15 +35,26 @@ export class Soundtrack {
 
   isMuted = () => this.muted;
 
+  isFinished = () => this.finished;
+
+  setOnEnded(listener: (() => void) | null) {
+    this.endedListener = listener;
+  }
+
   private emit() {
     for (const listener of this.listeners) listener();
   }
 
   private element() {
     if (!this.audio) {
-      this.audio = new Audio();
-      this.audio.loop = true;
-      this.audio.preload = "auto";
+      const audio = new Audio();
+      audio.preload = "auto";
+      audio.addEventListener("ended", () => {
+        if (audio.src === SILENCE) return;
+        this.finished = true;
+        this.endedListener?.();
+      });
+      this.audio = audio;
     }
     return this.audio;
   }
@@ -84,7 +99,7 @@ export class Soundtrack {
   /** Turns the sound on. Call it straight from a click or tap handler. */
   unmute() {
     this.muted = false;
-    if (this.track) {
+    if (this.track && !this.finished) {
       this.start(this.track);
     } else {
       const audio = this.element();
@@ -107,6 +122,7 @@ export class Soundtrack {
     const src = track && new URL(track, window.location.href).href;
     if (src === this.track) return;
     this.track = src;
+    this.finished = false;
     const audio = this.audio;
     if (this.muted || this.hidden || !audio) return;
     const attempt = ++this.switching;
@@ -126,8 +142,23 @@ export class Soundtrack {
       this.switching++;
       cancelAnimationFrame(this.fadeFrame);
       this.audio?.pause();
-    } else if (!this.muted && this.track) {
+    } else if (!this.muted && this.track && !this.finished) {
       this.start(this.track);
+    }
+  }
+
+  /**
+   * A video started playing: stop the preview for good, and count the sound
+   * as on, since the reader chose to hear something.
+   */
+  yieldToVideo() {
+    this.switching++;
+    cancelAnimationFrame(this.fadeFrame);
+    this.audio?.pause();
+    this.finished = true;
+    if (this.muted) {
+      this.muted = false;
+      this.emit();
     }
   }
 
@@ -140,6 +171,7 @@ export class Soundtrack {
     this.audio?.load();
     this.audio = null;
     this.track = null;
+    this.finished = false;
     this.muted = true;
     this.emit();
   }

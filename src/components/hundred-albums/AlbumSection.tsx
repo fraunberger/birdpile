@@ -4,10 +4,12 @@ import { Fragment, useEffect, useRef } from "react";
 import { ArrowDown, ArrowUpRight } from "lucide-react";
 import type { Album } from "@/lib/hundred-albums/albums";
 import { songName } from "@/lib/hundred-albums/itunes";
+import { youtubeVideo, type YouTubeVideo } from "@/lib/hundred-albums/list";
 import { cleanLyric, parseWriteup, placeholderLyric, placeholderWriteup, type Inline } from "@/lib/hundred-albums/writeup";
-import { FadeImage } from "./Artwork";
+import { FadeImage, useInView, useNear } from "./Artwork";
 import { useAlbumMedia } from "./media";
 import { trackScroll } from "./scroll";
+import { attachPlayer } from "./youtube";
 import styles from "./HundredAlbums.module.css";
 
 export function Runs({ runs }: { runs: Inline[] }) {
@@ -36,6 +38,39 @@ export function Equalizer({ playing }: { playing: boolean }) {
 }
 
 /**
+ * The full song on YouTube, in the write-up. The iframe exists only while the
+ * write-up is within a couple of screens, so a long list doesn't load a
+ * hundred players, but that's soon enough to be ready when the preview ends.
+ */
+function FullSong({ video, index }: { video: YouTubeVideo; index: number }) {
+  const [ref, inView] = useInView<HTMLDivElement>("200% 0px");
+  const frameRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    if (inView && frameRef.current) return attachPlayer(index, frameRef.current);
+  }, [inView, index]);
+
+  const params = new URLSearchParams({ enablejsapi: "1", playsinline: "1", rel: "0" });
+  if (video.start) params.set("start", String(video.start));
+  return (
+    <div className={styles.fullSong}>
+      <p className={styles.kicker}>The full song</p>
+      <div ref={ref} className={styles.video}>
+        {inView && (
+          <iframe
+            ref={frameRef}
+            src={`https://www.youtube.com/embed/${video.id}?${params}`}
+            title="The full song on YouTube"
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allowFullScreen
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
  * One album, as a guessing game: the lyric over the cover blurred past
  * recognizing, then the cover comes into focus with its name, and the
  * write-up scrolls up over it in a frosted box.
@@ -52,12 +87,15 @@ export function AlbumSection({
   /** Whether this album's song is the one playing. */
   playing: boolean;
 }) {
-  const ref = useRef<HTMLElement>(null);
-  const media = useAlbumMedia(album);
+  // Look the album up as it comes within a screen and a half, so lookups
+  // keep pace with reading instead of all going to Apple at once.
+  const [ref, near] = useNear<HTMLElement>("150% 0px");
+  const media = useAlbumMedia(album, near);
+  const video = youtubeVideo(album.youtube);
 
   useEffect(() => {
     if (ref.current) return trackScroll(ref.current);
-  }, []);
+  }, [ref]);
 
   const lyric = cleanLyric(album.lyric ?? placeholderLyric());
   const lyricSize = lyric.length < 50 ? styles.lyricShort : lyric.length > 120 ? styles.lyricLong : "";
@@ -118,6 +156,7 @@ export function AlbumSection({
                 </p>
               ))}
             </div>
+            {video && <FullSong video={video} index={index} />}
             <footer className={styles.writeupFoot}>
               <span className={styles.nowPlaying}>
                 <Equalizer playing={playing} />
