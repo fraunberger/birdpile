@@ -6,6 +6,7 @@ import { NeckStretch } from "@/components/neck-stretch/NeckStretch";
 import { JuncoHandoff } from "@/components/dark-eyed-junco/JuncoHandoff";
 import { PrizmichaelFrame } from "@/components/prizmichael/PrizmichaelFrame";
 import { HundredAlbums } from "@/components/hundred-albums/HundredAlbums";
+import { DrivetrainFinder } from "@/components/mountain-chickadee/DrivetrainFinder";
 import { RETROSPECTIVE } from "@/lib/hundred-albums/albums";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -45,6 +46,7 @@ export default async function BirdAppPage({
   const isFourThousandFooters = slug === "dark_eyed_junco" || slug === "dark-eyed-junco";
   const isPrizmichael = slug === "northern_mockingbird" || slug === "northern-mockingbird";
   const isHundredAlbums = isHundredAlbumsSlug(slug);
+  const isDrivetrains = slug === "mountain_chickadee" || slug === "mountain-chickadee";
 
   // The 4000-footer log first launched under the raven; keep those links working.
   if (slug === "common_raven" || slug === "common-raven") {
@@ -103,6 +105,20 @@ export default async function BirdAppPage({
           </div>
         </Link>
         <JuncoHandoff />
+      </div>
+    );
+  }
+
+  if (isDrivetrains) {
+    return (
+      <div className="min-h-screen bg-white font-mono text-black p-4">
+        <Link href="/" className="inline-flex items-center gap-2 mb-4 hover:opacity-70 transition-opacity group">
+          <span className="text-xl group-hover:-translate-x-1 transition-transform">&larr;</span>
+          <div className="relative w-12 h-8">
+            <Image src="/logo.png" alt="Apps" fill className="object-contain" />
+          </div>
+        </Link>
+        <DrivetrainFinder />
       </div>
     );
   }
