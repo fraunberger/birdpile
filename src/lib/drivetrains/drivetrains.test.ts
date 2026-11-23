@@ -36,6 +36,14 @@ test('SRAM weights come from sram.com', () => {
     }
 });
 
+test("Shimano weights come from Shimano's spec handbook, except Deore", () => {
+    for (const part of PARTS.filter((p) => p.brand === 'Shimano')) {
+        if (part.tier === 'Deore') continue;
+        assert.equal(part.weightSource.kind, 'manufacturer', part.id);
+        assert.match(part.weightSource.url, /^https:\/\/productinfo\.shimano\.com\/.*#page=\d+$/, part.id);
+    }
+});
+
 test('every preset is a rideable build', () => {
     for (const preset of PRESETS) {
         const parts = partsFromIds(preset.parts);

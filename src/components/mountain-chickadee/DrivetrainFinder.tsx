@@ -407,7 +407,7 @@ function CompareTab({
         <h2 className="text-lg font-bold">Groups as sold</h2>
         <p className="mb-2 text-sm text-stone-600">
           Each group with every part from one level. The last column shows whether mixing levels gets you a lighter build
-          for the same money or less.
+          for the same money or less, or the same weight for less.
         </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] text-sm">
@@ -425,7 +425,13 @@ function CompareTab({
                 .sort((a, b) => a.build.grams - b.build.grams)
                 .map(({ preset, build }) => {
                   const better = lightestWithin(builds, build.price);
-                  const beats = better && better.grams < build.grams - 0.5 ? better : null;
+                  // A mix "does better" if it's lighter for no more money, or as light for less.
+                  const beats =
+                    better &&
+                    (better.grams < build.grams - 0.5 ||
+                      (better.grams <= build.grams + 0.5 && better.price < build.price - 0.5))
+                      ? better
+                      : null;
                   return (
                     <tr
                       key={preset.id}
@@ -446,7 +452,9 @@ function CompareTab({
                       <td className="py-2 pr-2 text-stone-700">
                         {beats ? (
                           <button className="text-left underline decoration-dotted" onClick={() => onLoad(beats)}>
-                            {grams(build.grams - beats.grams)} lighter for {money(build.price - beats.price)} less
+                            {build.grams - beats.grams >= 0.5
+                              ? `${grams(build.grams - beats.grams)} lighter for ${money(build.price - beats.price)} less`
+                              : `Same weight for ${money(build.price - beats.price)} less`}
                           </button>
                         ) : (
                           <span className="text-stone-500">No. Already on the best-value edge</span>
@@ -576,7 +584,14 @@ function Scatter({
           </g>
         ))}
         {xTicks.map((t) => (
-          <text key={`x${t}`} x={x(t)} y={H - m.bottom + 18} textAnchor="middle" fontSize="11" fill="#57534e">
+          <text
+            key={`x${t}`}
+            x={x(t)}
+            y={H - m.bottom + 18}
+            textAnchor={t === xTicks[xTicks.length - 1] ? "end" : "middle"}
+            fontSize="11"
+            fill="#57534e"
+          >
             {money(t)}
           </text>
         ))}
