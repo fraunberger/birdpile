@@ -114,6 +114,11 @@ export const APP_CATALOG = [
     filename: "northern_mockingbird.jpeg",
     title: "Prizmichael",
   },
+  {
+    slug: "mountain_chickadee",
+    filename: "mountain_chickadee.jpeg",
+    title: "Drivetrain Finder",
+  },
 ] as const;
 
 export type BirdSlug = (typeof BIRD_CATALOG)[number]["slug"];

@@ -26,6 +26,16 @@ BirdFinds is a Next.js App Router project that uses bird slugs as routes for a s
     YouTube link per album plays the full song after the preview. It's one
     long page with 1–20, 21–40… shortcuts at the top. It's unlisted: not on
     the home grid and not indexed by search engines
+  - Drivetrain Finder (`/mountain_chickadee`), a Shimano vs SRAM 1x12
+    mountain bike drivetrain comparison, Deore and Eagle 90 up, with 165mm
+    cranks. It works through every rideable mix of shifter, derailleur,
+    cassette, chain and crankset to find the lightest build for a budget and the
+    best-value edge, and ranks single-part swaps by dollars per gram saved.
+    Every weight links to its source, preferring the manufacturer's own number,
+    and the tool marks whether each figure is a maker spec, a claim, a shop
+    listing or a scale weight. A Shop & deals tab links each part to shop
+    searches, and the prices you type in there replace the reference prices
+    in every comparison. The parts list lives in `src/lib/drivetrains/parts.ts`
   - Social prototype
   - Bird log views
 
@@ -114,7 +124,7 @@ Run these SQL files in Supabase SQL Editor:
 - `npm run build` - Production build
 - `npm run start` - Run production build
 - `npm run lint` - Run ESLint
-- `npm test` - Run the election and 100 Albums unit tests
+- `npm test` - Run the election, 100 Albums and drivetrain unit tests
 - `npm run test:highlight` - Run highlight parser + segmentation unit tests
 - `npm run clerk:csv-to-sql -- <csv-path>` - Convert Clerk CSV export to SQL `INSERT` rows for user migration
 
